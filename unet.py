@@ -1,5 +1,98 @@
-from unet_blocks import *
+import torch
+import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
+import revtorch as rv
+import numpy as np
+from utils import init_weights
+
+class ReversibleSequence(nn.Module):
+    def __init__(self, in_size, out_size, reversible_depth=3):
+        super(ReversibleSequence, self).__init__()
+        blocks = []
+        for i in range(reversible_depth):
+
+            #f and g must both be a nn.Module whos output has the same shape as its input
+            f_func = nn.Sequential(nn.Conv2d(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
+            g_func = nn.Sequential(nn.Conv2d(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
+
+            #we construct a reversible block with our F and G functions
+            blocks.append(rv.ReversibleBlock(f_func, g_func))
+
+        #pack all reversible blocks into a reversible sequence
+        self.sequence = rv.ReversibleSequence(nn.ModuleList(blocks))
+
+    def forward(self, x):
+        return self.sequence(x)
+
+
+class DownConvBlock(nn.Module):
+    """
+    A block of three convolutional layers where each layer is followed by a non-linear activation function
+    Between each block we add a pooling operation.
+    """
+    def __init__(self, input_dim, output_dim, initializers, padding, pool=True, reversible=False):
+        super(DownConvBlock, self).__init__()
+        layers = []
+
+        if pool:
+            layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
+
+        if not reversible:
+            layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(nn.ReLU(inplace=True))
+            layers.append(nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(nn.ReLU(inplace=True))
+            layers.append(nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(nn.ReLU(inplace=True))
+            self.layers = nn.Sequential(*layers)
+        else:
+            layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(nn.ReLU(inplace=True))
+            layers.append(ReversibleSequence(output_dim, output_dim))
+
+            self.layers = nn.Sequential(*layers)
+
+        self.layers.apply(init_weights)
+
+    def forward(self, patch):
+        return self.layers(patch)
+
+
+class UpConvBlock(nn.Module):
+    """
+    A block consists of an upsampling layer followed by a convolutional layer to reduce the amount of channels and then a DownConvBlock
+    If bilinear is set to false, we do a transposed convolution instead of upsampling
+    """
+
+    def __init__(self, input_dim, output_dim, initializers, padding, bilinear=True, reversible=False):
+        super(UpConvBlock, self).__init__()
+        self.bilinear = bilinear
+
+        if not self.bilinear:
+            self.upconv_layer = nn.ConvTranspose2d(input_dim, output_dim, kernel_size=2, stride=2)
+            self.upconv_layer.apply(init_weights)
+
+        self.conv_block = DownConvBlock(input_dim,
+                                        output_dim,
+                                        initializers,
+                                        padding,
+                                        pool=False,
+                                        reversible=reversible
+                                        )
+
+    def forward(self, x, bridge):
+        if self.bilinear:
+            up = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=True)
+        else:
+            up = self.upconv_layer(x)
+
+        assert up.shape[3] == bridge.shape[3]
+        out = torch.cat([up, bridge], 1)
+        out = self.conv_block(out)
+
+        return out
+
 
 class Unet(nn.Module):
     """
@@ -11,7 +104,9 @@ class Unet(nn.Module):
     padidng: Boolean, if true we pad the images with 1 so that we keep the same dimensions
     """
 
-    def __init__(self, input_channels, num_classes, num_filters, initializers, apply_last_layer=True, padding=True):
+    def __init__(self, input_channels, num_classes, num_filters,
+                 initializers, apply_last_layer=True, padding=True,
+                 reversible=False):
         super(Unet, self).__init__()
         self.input_channels = input_channels
         self.num_classes = num_classes
@@ -30,7 +125,8 @@ class Unet(nn.Module):
             else:
                 pool = True
 
-            self.contracting_path.append(DownConvBlock(input, output, initializers, padding, pool=pool))
+            self.contracting_path.append(
+                DownConvBlock(input, output, initializers, padding, pool=pool, reversible=reversible))
 
         self.upsampling_path = nn.ModuleList()
 
@@ -38,16 +134,16 @@ class Unet(nn.Module):
         for i in range(n, -1, -1):
             input = output + self.num_filters[i]
             output = self.num_filters[i]
-            self.upsampling_path.append(UpConvBlock(input, output, initializers, padding))
+            self.upsampling_path.append(UpConvBlock(input, output, initializers, padding, reversible=reversible))
 
         if self.apply_last_layer:
             self.last_layer = nn.Conv2d(output, num_classes, kernel_size=1)
             #nn.init.kaiming_normal_(self.last_layer.weight, mode='fan_in',nonlinearity='relu')
             #nn.init.normal_(self.last_layer.bias)
 
-
     def forward(self, x, val):
         blocks = []
+
         for i, down in enumerate(self.contracting_path):
             x = down(x)
             if i != len(self.contracting_path)-1:
@@ -63,6 +159,6 @@ class Unet(nn.Module):
             self.activation_maps.append(x)
         
         if self.apply_last_layer:
-            x =  self.last_layer(x)
+            x = self.last_layer(x)
 
         return x
