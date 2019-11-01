@@ -8,14 +8,13 @@ from sklearn.metrics import f1_score, classification_report, confusion_matrix
 from medpy.metric import dc, assd, hd
 
 import config.system as sys_config
-from phiseg.phiseg_model import segvae
+from train_model import net
 import utils
 
 if not sys_config.running_on_gpu_host:
     import matplotlib.pyplot as plt
 
 import logging
-from data.data_switch import data_switch
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 structures_dict = {1: 'RV', 2: 'Myo', 3: 'LV'}
@@ -27,9 +26,8 @@ def main(model_path, exp_config, do_plots=False):
     n_samples = 50
     model_selection = 'best_ged'
 
-    # Get Data
-    segvae_model = segvae(exp_config=exp_config)
-    segvae_model.load_weights(model_path, type=model_selection)
+    # 1. Load trained model
+    net.load_weights(model_path, type=model_selection)
 
     data_loader = data_switch(exp_config.data_identifier)
     data = data_loader(exp_config)

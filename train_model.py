@@ -22,7 +22,7 @@ import utils
 import config.system as sys_config
 from models.probabilistic_unet import ProbabilisticUnet
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+logging.basicConfig(filename='./test.log', level=logging.INFO, format='%(asctime)s %(message)s')
 
 
 def load_data_into_loader():
@@ -49,11 +49,6 @@ def train(train_loader, epochs):
             patch = patch.to(device)
             mask = mask.to(device)
             mask = torch.unsqueeze(mask, 1)
-            # if step == 0:
-            #     writer.add_graph(
-            #         ProbabilisticUnet(input_channels=1, num_classes=1, num_filters=[32, 64, 128, 192], latent_dim=2,
-            #                           no_convs_fcomb=4, beta=10.0, reversible=True), [patch, mask], verbose=True)
-            #     writer.close()
 
             net.forward(patch, mask, training=True)
             elbo = net.elbo(mask)
@@ -125,43 +120,62 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Script for training")
     parser.add_argument("EXP_PATH", type=str, help="Path to experiment config file")
+    parser.add_argument("LOCAL", type=str, help="Is this script run on the local machine or the BIWI cluster?")
+    parser.add_argument("dummy", type=str, help="Is the module run with dummy training?")
     args = parser.parse_args()
 
     config_file = args.EXP_PATH
     config_module = config_file.split('/')[-1].rstrip('.py')
 
+    if args.LOCAL == 'local':
+        import config.local_config as sys_config
+
+
     logging.info('Running experiment with script: {}'.format(config_file))
 
     exp_config = SourceFileLoader(config_module, config_file).load_module()
 
-    # log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
-    # utils.makefolder(log_dir)
+    log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
 
-    # shutil.copy(exp_config.__file__, log_dir)
-    # logging.info('!!!! Copied exp_config file to experiment folder !!!!')
+    utils.makefolder(log_dir)
+
+    shutil.copy(exp_config.__file__, log_dir)
+    logging.info('!!!! Copied exp_config file to experiment folder !!!!')
 
     writer = SummaryWriter()
 
+    logging.info('**************************************************************')
+    logging.info(' *** Running Experiment: %s', exp_config.experiment_name)
+    logging.info('**************************************************************')
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    train_loader, test_loader = load_data_into_loader()
-    #
-    net = ProbabilisticUnet(input_channels=exp_config.input_channels,
-                            num_classes=1,
-                            num_filters=exp_config.filter_channels,
-                            latent_dim=2,
-                            no_convs_fcomb=4,
-                            beta=10.0,
-                            reversible=exp_config.use_reversible)
+
+    net = exp_config.model(input_channels=exp_config.input_channels,
+                           num_classes=1,
+                           num_filters=exp_config.filter_channels,
+                           latent_dim=2,
+                           no_convs_fcomb=4,
+                           beta=10.0,
+                           reversible=exp_config.use_reversible
+                           )
+
+
 
     net.to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=0)
 
     epochs = 100
-    train(train_loader)
-    #print(exp_config.experiment_name)
-    #dummy_train()
 
-    torch.save(net.state_dict(), './models/prob_unet.pth')
+    if args.dummy == 'dummy':
+        dummy_train()
+    else:
+        train_loader, test_loader = load_data_into_loader()
+        train(train_loader)
 
+    logging.info('Finished training the model.')
+
+    model_name = exp_config.experiment_name + '.pth'
+    save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
+    torch.save(net.state_dict(), save_model_path)
+    logging.info('saved model to .pth file in {}'.format(save_model_path))
 

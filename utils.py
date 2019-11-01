@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
 #import matplotlib.pyplot as plt
+import os
 
 def truncated_normal_(tensor, mean=0, std=1):
     size = tensor.shape
