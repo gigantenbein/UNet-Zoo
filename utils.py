@@ -40,3 +40,14 @@ def save_mask_prediction_example(mask, pred, iter):
 	plt.savefig('images/'+str(iter)+"_prediction.png")
 	plt.imshow(mask[0,:,:],cmap='Greys')
 	plt.savefig('images/'+str(iter)+"_mask.png")
+
+def makefolder(folder):
+    '''
+    Helper function to make a new folder if doesn't exist
+    :param folder: path to new folder
+    :return: True if folder created, False if folder already exists
+    '''
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+        return True
+    return False

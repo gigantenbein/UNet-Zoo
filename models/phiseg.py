@@ -60,14 +60,33 @@ class UpConvolutionalBlock(nn.Module):
         return out
 
 
-class LikelihoodUpConvolutionBlock(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(LikelihoodUpConvolutionBlock, self).__init__()
-        self.upconv = nn.Sequential(
-            nn.functional.interpolate(mode='bilinear', scale_factor=2, align_corners=True),
-            nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1),
+def increase_resolution_block(output_dim):
+    """Sequence of bilinear upsampling and 3x3"""
+    return nn.Sequential(
+            nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=1),
             nn.ReLU()
         )
+
+
+def post_z_path(input_dim):
+    return nn.Sequential(nn.Conv2d(input_dim, input_dim, kernel_size=3, padding=1),
+                         nn.Conv2d(input_dim, input_dim, kernel_size=3, padding=1),
+                         )
+
+
+def below_cat_path(output_dim):
+    return nn.Sequential(nn.functional.interpolate(mode='bilinear', scale_factor=2, align_corners=True),
+                         nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=1),
+                         nn.ReLU()
+                         )
+
+
+def post_c_path(output_dim):
+    return nn.Sequential(nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=1),
+                         nn.ReLU(),
+                         nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=1),
+                         nn.ReLU()
+                         )
 
 
 class PHISeg(nn.Module):
@@ -80,11 +99,14 @@ class PHISeg(nn.Module):
     padding: Boolean, if true we pad the images with 1 so that we keep the same dimensions
     """
 
-    def __init__(self, input_channels, num_classes, num_filters, initializers, apply_last_layer=True, padding=True):
+    def __init__(self, input_channels, num_classes, num_filters, initializers=None, apply_last_layer=True, padding=True):
         super(PHISeg, self).__init__()
         self.input_channels = input_channels
         self.num_classes = num_classes
         self.num_filters = num_filters
+
+        self.latent_levels = (len(self.num_filters) - 1)
+
         self.padding = padding
         self.activation_maps = []
         self.apply_last_layer = apply_last_layer
@@ -105,13 +127,32 @@ class PHISeg(nn.Module):
 
         self.upsampling_path = nn.ModuleList()
 
-        n = len(self.num_filters) - 2
-        for i in range(n, -1, -1):
+        for i in range(self.latent_levels - 1, -1, -1):
             input = output + self.num_filters[i]
             output = self.num_filters[i]
             self.upsampling_path.append(UpConvolutionalBlock(input, output, initializers, padding))
 
+
         # LIKELIHOOD
+        self.likelihood_ups_path = nn.ModuleList()
+        self.likelihood_post_z_path = nn.ModuleList()
+
+        for i in range(self.latent_levels, 0 ,-1):
+            input = self.num_filters[i]
+            output = self.num_filters[i-1]
+            self.likelihood_ups_path.append(post_z_path(input))
+            self.likelihood_post_z_path.append(increase_resolution_block(output))
+
+        self.likelihood_cat_path = nn.ModuleList()
+        for i in range(self.latent_levels, 0, -1):
+            input = self.num_filters[i]
+            self.likelihood_below_cat_path.append(below_cat_path(input))
+            self.likelihood_post_c_path.append(post_c_path(input))
+
+        self.s_layer = nn.ModuleList()
+        for i in range(self.latent_levels,0, -1):
+            input = self.num_filters[i]
+            self.s_layer.append(nn.Conv2d(input,input, kernel=1))
 
     def posterior(self, x, val):
         blocks = []
@@ -146,7 +187,35 @@ class PHISeg(nn.Module):
 
         return x
 
+    # TODO: DEBUG
     def likelihood(self, z):
-        s = [None] * (len(self.num_filters) - 2)
+        """Likelihood network which takes list of latent variables z with dimension latent_levels"""
+        s = [None] * self.latent_levels
+        post_z = [None] * self.latent_levels
+        post_c = [None] * self.latent_levels
+
+        # start from the downmost layer and the last filter
+        for i, up in enumerate(self.num_filters):
+            post_z[-i-1] = self.likelihood_ups_path[i](z[-i-1])
+            post_z[-i-1] = nn.functional.interpolate(post_z[-i-1], mode='bilinear', scale_factor=2, align_corners=True)
+            post_z[-i-1] = self.likelihood_post_z_path[i](post_z[-i-1])
+
+        post_c[self.latent_levels - 1] = post_z[self.latent_levels - 1]
+
+        for i in reversed(range(self.latent_levels - 1)):
+            ups_below = self.likelihood_below_cat_path[i](post_c[i+1])
+
+            # TODO: is this the right axis?
+            concat = torch.cat([post_z[i], ups_below], axis=3)
+
+            post_c[i] = self.likelihood_post_c_path[i](concat)
+
+        # TODO: debug me
+        for block in self.s_layer:
+            s_in = block(post_c[i])
+            s[i] = s_in # TODO: resize image here
 
         return s
+
+    def forward(self, patch, mask, training=True):
+        pass

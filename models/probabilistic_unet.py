@@ -2,11 +2,9 @@
 
 import torch
 import torch.nn as nn
-from unet import Unet
-from utils import init_weights, init_weights_orthogonal_normal, l2_regularisation
-import torch.nn.functional as F
+from models.unet import Unet
+from utils import init_weights, init_weights_orthogonal_normal
 from torch.distributions import Normal, Independent, kl
-from torch.autograd import Variable
 import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

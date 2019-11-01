@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 import revtorch as rv
-import numpy as np
 from utils import init_weights
+
 
 class ReversibleSequence(nn.Module):
     def __init__(self, in_size, out_size, reversible_depth=3):
