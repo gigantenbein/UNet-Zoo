@@ -22,7 +22,7 @@ import utils
 import config.system as sys_config
 from models.probabilistic_unet import ProbabilisticUnet
 
-logging.basicConfig(filename='./test.log', level=logging.INFO, format='%(asctime)s %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 
 def load_data_into_loader():
