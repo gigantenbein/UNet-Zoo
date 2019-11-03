@@ -170,7 +170,7 @@ if __name__ == '__main__':
         dummy_train()
     else:
         train_loader, test_loader = load_data_into_loader()
-        train(train_loader)
+        train(train_loader, epochs)
 
     logging.info('Finished training the model.')
 

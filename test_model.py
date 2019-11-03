@@ -1,4 +1,4 @@
-
+import torch
 import numpy as np
 import os
 import glob
@@ -14,11 +14,12 @@ import utils
 if not sys_config.running_on_gpu_host:
     import matplotlib.pyplot as plt
 
+from train_model import load_data_into_loader
+
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 structures_dict = {1: 'RV', 2: 'Myo', 3: 'LV'}
-
 
 
 def main(model_path, exp_config, do_plots=False):
@@ -26,24 +27,37 @@ def main(model_path, exp_config, do_plots=False):
     n_samples = 50
     model_selection = 'best_ged'
 
-    # 1. Load trained model
-    net.load_weights(model_path, type=model_selection)
+    # Get Data
+    net = exp_config.model(input_channels=exp_config.input_channels,
+                           num_classes=1,
+                           num_filters=exp_config.filter_channels,
+                           latent_dim=2,
+                           no_convs_fcomb=4,
+                           beta=10.0,
+                           reversible=exp_config.use_reversible
+                           )
 
-    data_loader = data_switch(exp_config.data_identifier)
-    data = data_loader(exp_config)
+    model_name = exp_config.experiment_name + '.pth'
+    save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
 
-    N = data.test.images.shape[0]
+    net.load_state_dict(torch.load(save_model_path))
+
+    _, data = load_data_into_loader()
+
+
+
+
 
     ged_list = []
     ncc_list = []
 
-    for ii in range(N):
+    for ii, (patch, mask, _) in enumerate(dataloader):
 
         if ii % 10 == 0:
             logging.info("Progress: %d" % ii)
 
-        x_b = data.test.images[ii, ...].reshape([1] + list(exp_config.image_size))
-        s_b = data.test.labels[ii, ...]
+        x_b = patch.reshape([1] + list(exp_config.image_size))
+        s_b = patch
 
         x_b_stacked = np.tile(x_b, [n_samples, 1, 1, 1])
 
@@ -82,21 +96,20 @@ def main(model_path, exp_config, do_plots=False):
     np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
 
 
+
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="Script for training")
-    parser.add_argument("EXP_PATH", type=str, help="Path to experiment config file")
+    parser = argparse.ArgumentParser(
+        description="Script for a simple test loop evaluating a network on the test dataset")
+    parser.add_argument("EXP_PATH", type=str, help="Path to experiment folder (assuming you are in the working directory)")
     args = parser.parse_args()
 
-    config_file = args.EXP_PATH
+    base_path = sys_config.project_root
+
+    model_path = args.EXP_PATH
+    config_file = glob.glob(model_path + '/*py')[0]
     config_module = config_file.split('/')[-1].rstrip('.py')
 
-    logging.info('Running experiment with script: {}'.format(config_file))
+    exp_config = SourceFileLoader(config_module, os.path.join(config_file)).load_module()
 
-    exp_config = SourceFileLoader(config_module, config_file).load_module()
-
-    # log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
-    # utils.makefolder(log_dir)
-
-    # shutil.copy(exp_config.__file__, log_dir)
-    # logging.info('!!!! Copied exp_config file to experiment folder !!!!')
+    main(model_path, exp_config=exp_config, do_plots=False)
