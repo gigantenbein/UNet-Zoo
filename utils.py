@@ -132,7 +132,8 @@ def variance_ncc_dist(sample_arr, gt_arr):
     :return: 
     """
 
-    mean_seg = np.mean(sample_arr, axis=0)
+    #mean_seg = np.mean(sample_arr, axis=0)
+    mean_seg = sample_arr
 
     N = sample_arr.shape[0]
     M = gt_arr.shape[0]

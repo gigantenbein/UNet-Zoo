@@ -19,13 +19,12 @@ from load_LIDC_data import LIDC_IDRI
 from utils import l2_regularisation
 import argparse
 import utils
-import config.system as sys_config
 from models.probabilistic_unet import ProbabilisticUnet
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 
-def load_data_into_loader():
+def load_data_into_loader(sys_config):
     dataset = LIDC_IDRI(dataset_location=sys_config.data_root)
 
     dataset_size = len(dataset)
@@ -36,7 +35,7 @@ def load_data_into_loader():
     train_sampler = SubsetRandomSampler(train_indices)
     test_sampler = SubsetRandomSampler(test_indices)
     train_loader = DataLoader(dataset, batch_size=5, sampler=train_sampler)
-    test_loader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
+    test_loader = DataLoader(dataset, batch_size=5, sampler=test_sampler)
     print("Number of training/test patches:", (len(train_indices),len(test_indices)))
 
     return train_loader, test_loader
@@ -91,7 +90,7 @@ def test(test_loader):
 
 
 def load_dummy_dataset():
-    with open(os.path.join(sys_config.data_root, 'dummy.pickle'), 'rb') as handle:
+    with open(os.path.join(sys_config.data_root, 'dummy/dummy.pickle'), 'rb') as handle:
         dummy = pickle.load(handle)
         return dummy
 
@@ -128,7 +127,10 @@ if __name__ == '__main__':
     config_module = config_file.split('/')[-1].rstrip('.py')
 
     if args.LOCAL == 'local':
+        print('Running with local configuration')
         import config.local_config as sys_config
+    else:
+        import config.system as sys_config
 
 
     logging.info('Running experiment with script: {}'.format(config_file))
@@ -169,7 +171,7 @@ if __name__ == '__main__':
     if args.dummy == 'dummy':
         dummy_train()
     else:
-        train_loader, test_loader = load_data_into_loader()
+        train_loader, test_loader = load_data_into_loader(sys_config)
         train(train_loader, epochs)
 
     logging.info('Finished training the model.')
