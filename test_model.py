@@ -74,8 +74,8 @@ def main(model_path, exp_config, sys_config, do_plots=False):
     logging.info(np.mean(ncc_arr))
     logging.info(np.std(ncc_arr))
 
-    np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_arr)
-    np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
+   # np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_arr)
+   # np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
 
 
 
