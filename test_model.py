@@ -4,8 +4,8 @@ import os
 import glob
 from importlib.machinery import SourceFileLoader
 import argparse
-from sklearn.metrics import f1_score, classification_report, confusion_matrix
-from medpy.metric import dc, assd, hd
+# from sklearn.metrics import f1_score, classification_report, confusion_matrix
+# from medpy.metric import dc, assd, hd
 
 import utils
 
