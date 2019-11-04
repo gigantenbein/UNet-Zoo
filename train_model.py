@@ -108,7 +108,8 @@ def dummy_train():
 
     net.sample()
 
-   #net.forward(patch, mask, training=True)
+    print(net)
+    net.forward(patch, mask, training=True)
     elbo = net.elbo(mask)
     reg_loss = l2_regularisation(net.posterior) + l2_regularisation(net.prior) + l2_regularisation(
         net.fcomb.layers)
