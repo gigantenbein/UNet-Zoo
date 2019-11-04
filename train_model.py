@@ -43,6 +43,7 @@ def load_data_into_loader(sys_config):
 
 def train(train_loader, epochs):
     net.train()
+    logging.info('Starting training.')
     for epoch in range(epochs):
         for step, (patch, mask, _) in enumerate(train_loader):
             patch = patch.to(device)
@@ -57,7 +58,10 @@ def train(train_loader, epochs):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            print('step')
+            if step%100 == 0:
+                logging.info('Epoch: {} Number of processed patches: {}'.format(epoch, step))
+        logging.info('Finished epoch {}'.format(epoch))
+    logging.info('Finished training.')
 
 
 def test(test_loader):
@@ -102,7 +106,9 @@ def dummy_train():
     patch = dataset[0].view(1, 1, 128, 128).to(device)
     mask = dataset[1].view(1, 1, 128, 128).to(device)
 
-    net.forward(patch, mask, training=True)
+    net.sample()
+
+   #net.forward(patch, mask, training=True)
     elbo = net.elbo(mask)
     reg_loss = l2_regularisation(net.posterior) + l2_regularisation(net.prior) + l2_regularisation(
         net.fcomb.layers)
@@ -131,7 +137,6 @@ if __name__ == '__main__':
         import config.local_config as sys_config
     else:
         import config.system as sys_config
-
 
     logging.info('Running experiment with script: {}'.format(config_file))
 
