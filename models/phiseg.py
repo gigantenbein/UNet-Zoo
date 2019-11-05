@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 class Conv2DSequence(nn.Module):
     """Block with 2D convolutions after each other with ReLU activation"""
@@ -149,9 +152,9 @@ class Likelihood(nn.Module):
             self.likelihood_post_c_path.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2))
 
         self.s_layer = nn.ModuleList()
+        output = self.num_classes
         for i in range(self.latent_levels, 0, -1):
             input = self.num_filters[i-1]
-            output = self.num_filters[i-1]
             self.s_layer.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2, kernel=1))
 
     def forward(self, z):
@@ -187,7 +190,7 @@ class Likelihood(nn.Module):
 
         for i, block in enumerate(self.s_layer):
             s_in = block(post_c[-i-1])
-            s[-i-1] = s_in
+            s[-i-1] = torch.nn.functional.interpolate(s_in, size=[128, 128], mode='nearest')
 
         return s
 
@@ -271,7 +274,7 @@ class Posterior(nn.Module):
 
         del blocks
 
-        return z
+        return z, mu, sigma
 
 
 class PHISeg(nn.Module):
@@ -294,6 +297,7 @@ class PHISeg(nn.Module):
                  beta=10.0,
                  reversible=False,
                  apply_last_layer=True,
+                 exponential_weighting=True,
                  padding=True):
         super(PHISeg, self).__init__()
         self.input_channels = input_channels
@@ -302,32 +306,153 @@ class PHISeg(nn.Module):
 
         self.latent_levels = (len(self.num_filters) - 1)
 
+        self.loss_dict={}
+        self.KL_divergence_loss_weight = 1.0
+
+        self.beta = 10.0
+
         self.padding = padding
         self.activation_maps = []
         self.apply_last_layer = apply_last_layer
+        self.exponential_weighting = exponential_weighting
+        self.residual_multinoulli_loss_weight = 1.0
 
         self.posterior = Posterior(input_channels, num_classes, num_filters, initializers=None, padding=True)
         self.likelihood = Likelihood(input_channels, num_classes, num_filters, initializers=None, apply_last_layer=True, padding=True)
         self.prior = Posterior(input_channels, num_classes, num_filters, initializers=None, padding=True, is_posterior=False)
 
-    def sample(self):
-        pass
+    def sample_posterior(self):
+        z_sample = [None] * self.latent_levels
+        mu = self.posterior_mu
+        sigma = self.posterior_sigma
+        for i, _ in enumerate(z_sample):
+            z_sample[i] = mu[i] + sigma[i] * torch.randn_like(sigma[i])
 
-    def reconstruct(self):
-        pass
+        return z_sample
+
+    def sample_prior(self):
+        z_sample = [None] * self.latent_levels
+        mu = self.posterior_mu
+        sigma = self.posterior_sigma
+        for i, _ in enumerate(z_sample):
+            z_sample[i] = mu[i] + sigma[i] * torch.randn_like(sigma[i])
+        return z_sample
+
+    def reconstruct(self, z_posterior):
+        return self.accumulate_output(self.likelihood(z_posterior))
 
     def forward(self, patch, mask, training=True):
         if training:
-            self.posterior_latent_space = self.posterior(patch, mask)
-            self.segm_vector = self.likelihood(self.posterior_latent_space)
-        else:
-            self.prior_latent_space = self.prior(patch)
-            self.segm_vector = self.likelihood(self.prior_latent_space)
+            self.posterior_latent_space, self.posterior_mu, self.posterior_sigma = self.posterior(patch, mask)
+
+        self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch)
+        self.segm_vector = self.likelihood(self.prior_latent_space)
 
         return self.segm_vector
 
+    def accumulate_output(self, output_list, use_softmax=True):
+        s_accum = output_list[-1]
+        for i in range(len(output_list) - 1):
+            s_accum += output_list[i]
+        if use_softmax:
+            return torch.nn.functional.softmax(s_accum)
+        return s_accum
+
+    def KL_two_gauss_with_diag_cov(self, mu0, sigma0, mu1, sigma1):
+
+        sigma0_fs = torch.mul(torch.flatten(sigma0, start_dim=1), torch.flatten(sigma0, start_dim=1))
+        sigma1_fs = torch.mul(torch.flatten(sigma1, start_dim=1), torch.flatten(sigma0, start_dim=1))
+
+        logsigma0_fs = torch.log(sigma0_fs + 1e-10)
+        logsigma1_fs = torch.log(sigma1_fs + 1e-10)
+
+        mu0_f = torch.flatten(mu0, start_dim=1)
+        mu1_f = torch.flatten(mu1, start_dim=1)
+
+        return torch.mean(
+            0.5*torch.sum(
+                torch.div(
+                    sigma0_fs + torch.mul((mu1_f - mu0_f), (mu1_f - mu0_f)),
+                    sigma1_fs + 1e-10)
+                + logsigma1_fs - logsigma0_fs - 1, dim=1)
+        )
+
+    def calculate_hierarchical_KL_div_loss(self):
+
+        prior_sigma_list = self.prior_sigma
+        prior_mu_list = self.prior_mu
+        posterior_sigma_list = self.posterior_sigma
+        posterior_mu_list = self.posterior_mu
+
+        loss_tot = 0
+
+        if self.exponential_weighting:
+            level_weights = [4**i for i in list(range(self.latent_levels))]
+        else:
+            level_weights = [1]*self.latent_levels
+
+        for ii, mu_i, sigma_i in zip(reversed(range(self.latent_levels)),
+                                     reversed(posterior_mu_list),
+                                     reversed(posterior_sigma_list)):
+
+            self.loss_dict['KL_divergence_loss_lvl%d' % ii] = level_weights[ii]*self.KL_two_gauss_with_diag_cov(
+                mu_i,
+                sigma_i,
+                prior_mu_list[ii],
+                prior_sigma_list[ii])
+
+            logging.info(' -- Added hierarchical loss with at level %d with alpha_%d=%d' % (ii,ii, level_weights[ii]))
+
+            loss_tot += self.KL_divergence_loss_weight * self.loss_dict['KL_divergence_loss_lvl%d' % ii]
+
+        return loss_tot
+
+
+    def residual_multinoulli_loss(self, input, target):
+
+        self.s_accumulated = [None] * self.latent_levels
+        loss_tot = 0
+        target = target.view(1,128,128)
+        criterion = torch.nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction='sum')
+        for ii, s_ii in zip(reversed(range(self.latent_levels)),
+                            reversed(input)):
+
+            if ii == self.latent_levels-1:
+
+                self.s_accumulated[ii] = s_ii
+                self.loss_dict['residual_multinoulli_loss_lvl%d' % ii] = criterion(target, self.s_accumulated[ii])
+
+            else:
+
+                self.s_accum[ii] = self.s_accum[ii+1] + s_ii
+                self.loss_dict['residual_multinoulli_loss_lvl%d' % ii] = criterion(target, self.s_accumulated[ii])
+
+            logging.info(' -- Added residual multinoulli loss at level %d' % (ii))
+
+            loss_tot += self.residual_multinoulli_loss_weight * self.loss_dict['residual_multinoulli_loss_lvl%d' % ii]
+        return loss_tot
+
     def kl_divergence(self):
-    """Kullback-Leibler Divergence for n latent levels"""
-        pass
-    def elbo(self):
-        pass
+        loss = self.calculate_hierarchical_KL_div_loss()
+        return loss
+
+    def elbo(self, segm, beta=10.0, reconstruct_posterior_mean=False):
+        """
+        Calculate the evidence lower bound of the log-likelihood of P(Y|X)
+        """
+
+        z_posterior = self.sample_posterior()
+
+        self.kl = torch.mean(
+            self.kl_divergence()
+        )
+
+        # Here we use the posterior sample sampled above
+        self.reconstruction = self.reconstruct(z_posterior=z_posterior)
+
+        reconstruction_loss = self.residual_multinoulli_loss(input=self.reconstruction, target=segm)
+
+        self.reconstruction_loss = torch.sum(reconstruction_loss)
+        self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
+
+        return -(self.reconstruction_loss + self.beta * self.kl)

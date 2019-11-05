@@ -106,19 +106,18 @@ def dummy_train():
     patch = dataset[0].view(1, 1, 128, 128).to(device)
     mask = dataset[1].view(1, 1, 128, 128).to(device)
 
-    net.sample()
 
     print(net)
     net.forward(patch, mask, training=True)
     elbo = net.elbo(mask)
-    reg_loss = l2_regularisation(net.posterior) + l2_regularisation(net.prior) + l2_regularisation(
-        net.fcomb.layers)
-    loss = -elbo + 1e-5 * reg_loss
+    # reg_loss = l2_regularisation(net.posterior) + l2_regularisation(net.prior) + l2_regularisation(
+    #     net.fcomb.layers)
+    # loss = -elbo + 1e-5 * reg_loss
+    loss = -elbo
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    writer.add_graph(net, [patch, mask])
-    writer.close()
+
     print('step')
 
 
