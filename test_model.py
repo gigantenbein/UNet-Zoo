@@ -1,4 +1,5 @@
 import torch
+from torchvision.utils import save_image
 import numpy as np
 import os
 import glob
@@ -25,6 +26,7 @@ def main(model_path, exp_config, sys_config, do_plots=False):
     n_samples = 50
     model_selection = 'best_ged'
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Get Data
     net = exp_config.model(input_channels=exp_config.input_channels,
                            num_classes=1,
@@ -35,10 +37,14 @@ def main(model_path, exp_config, sys_config, do_plots=False):
                            reversible=exp_config.use_reversible
                            )
 
+    net.to(device)
+
     model_name = exp_config.experiment_name + '.pth'
     save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
 
-    net.load_state_dict(torch.load(save_model_path))
+    map = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    net.load_state_dict(torch.load('/Users/marcgantenbein/scratch/ProbabilisticUnet.pth', map_location=map))
     net.eval()
 
     _, data = load_data_into_loader(sys_config)
@@ -46,10 +52,12 @@ def main(model_path, exp_config, sys_config, do_plots=False):
     ged_list = []
     ncc_list = []
 
+    ged = 0
     for ii, (patch, mask, _) in enumerate(data):
 
         if ii % 10 == 0:
             logging.info("Progress: %d" % ii)
+            print("Progress: {} GED: {}".format(ii, ged))
 
         net.forward(patch, mask, training=False)
         sample = net.sample(testing=True)
@@ -57,6 +65,12 @@ def main(model_path, exp_config, sys_config, do_plots=False):
 
         ged = utils.generalised_energy_distance(sample, ground_truth_label, 1, label_range=range(1,1))
         ged_list.append(ged)
+
+        n = min(mask.size(0), 8)
+        comparison = torch.cat([mask[1].view(1, 128, 128),
+                                sample[1].view(1, 128, 128)])
+        save_image(comparison.cpu(),
+                   'results/reconstruction_' + str(ii) + '.png', nrow=n)
 
         #ncc = utils.variance_ncc_dist(sample, ground_truth_label)
         #ncc_list.append(ncc)
