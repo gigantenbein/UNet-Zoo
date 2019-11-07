@@ -146,21 +146,21 @@ if __name__ == '__main__':
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # net = exp_config.model(input_channels=exp_config.input_channels,
-    #                        num_classes=1,
-    #                        num_filters=exp_config.filter_channels,
-    #                        latent_dim=exp_config.latent_levels,
-    #                        no_convs_fcomb=4,
-    #                        beta=10.0,
-    #                        reversible=exp_config.use_reversible
-    #                        )
-
     net = exp_config.model(input_channels=exp_config.input_channels,
                            num_classes=2,
                            num_filters=exp_config.filter_channels,
-                           initializers=None,
+                           latent_dim=exp_config.latent_levels,
+                           no_convs_fcomb=4,
+                           beta=10.0,
                            reversible=exp_config.use_reversible
                            )
+    #
+    # net = exp_config.model(input_channels=exp_config.input_channels,
+    #                        num_classes=2,
+    #                        num_filters=exp_config.filter_channels,
+    #                        initializers=None,
+    #                        reversible=exp_config.use_reversible
+    #                        )
 
     net.to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=0)

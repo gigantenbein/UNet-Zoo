@@ -104,7 +104,7 @@ class Unet(nn.Module):
     """
 
     def __init__(self, input_channels, num_classes, num_filters,
-                 initializers, apply_last_layer=True, padding=True,
+                 initializers=None, apply_last_layer=True, padding=True,
                  reversible=False, training=False):
         super(Unet, self).__init__()
         self.input_channels = input_channels
@@ -140,6 +140,9 @@ class Unet(nn.Module):
             self.last_layer = nn.Conv2d(output, num_classes, kernel_size=1)
             #nn.init.kaiming_normal_(self.last_layer.weight, mode='fan_in',nonlinearity='relu')
             #nn.init.normal_(self.last_layer.bias)
+
+    def sample(self, testing=True):
+        return self.prediction
 
     def forward(self, x, mask=None, training=True, val=False):
         """

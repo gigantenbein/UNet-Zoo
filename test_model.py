@@ -96,7 +96,7 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
    # np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_arr)
    # np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
 
-def test_segmentation():
+def test_segmentation(exp_config, sys_config):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Get Data
@@ -111,12 +111,12 @@ def test_segmentation():
 
     net.to(device)
 
-    model_name = exp_config.experiment_name + '.pth'
-    save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
+    #model_name = exp_config.experiment_name + '.pth'
+    #save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
 
     map = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net.load_state_dict(torch.load('/Users/marcgantenbein/scratch/ProbabilisticUnet.pth', map_location=map))
+    net.load_state_dict(torch.load('/Users/marcgantenbein/PycharmProjects/UNet-Zoo/models/ProbabilisticUnet.pth', map_location=map))
     net.eval()
 
     _, data = load_data_into_loader(sys_config)
@@ -125,7 +125,7 @@ def test_segmentation():
 
         if ii % 10 == 0:
             logging.info("Progress: %d" % ii)
-            print("Progress: {} GED: {}".format(ii, ged))
+            print("Progress: {}".format(ii))
 
         net.forward(patch, mask, training=False)
         sample = net.sample(testing=True)
@@ -135,7 +135,7 @@ def test_segmentation():
                                 mask.view(-1, 1, 128, 128)[:n],
                                 sample.view(-1, 1, 128, 128)[:n]])
         save_image(comparison.cpu(),
-                   'segmentation/comp_' + str(ii) + '.png', nrow=n)
+                   'segmentation/prob_unet/comp_' + str(ii) + '.png', nrow=n)
 
 
 if __name__ == '__main__':
@@ -161,4 +161,5 @@ if __name__ == '__main__':
 
     exp_config = SourceFileLoader(config_module, os.path.join(config_file)).load_module()
 
-    main(model_path, exp_config=exp_config, sys_config=sys_config, do_plots=False)
+    test_segmentation(exp_config, sys_config)
+    #main(model_path, exp_config=exp_config, sys_config=sys_config, do_plots=False)
