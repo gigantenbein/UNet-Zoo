@@ -339,7 +339,8 @@ class PHISeg(nn.Module):
         return z_sample
 
     def reconstruct(self, z_posterior):
-        return self.accumulate_output(self.likelihood(z_posterior))
+        layer_recon = self.likelihood(z_posterior)
+        return self.accumulate_output(layer_recon), layer_recon
 
     def forward(self, patch, mask, training=True):
         if training:
@@ -407,25 +408,26 @@ class PHISeg(nn.Module):
 
         return loss_tot
 
-
     def residual_multinoulli_loss(self, input, target):
 
         self.s_accumulated = [None] * self.latent_levels
         loss_tot = 0
-        target = target.view(1,128,128)
-        criterion = torch.nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction='sum')
+        target = target.view(-1, 128, 128).long()
+        #criterion = torch.nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction='sum')
+
+        criterion = torch.nn.CrossEntropyLoss(reduction='sum')
         for ii, s_ii in zip(reversed(range(self.latent_levels)),
                             reversed(input)):
 
             if ii == self.latent_levels-1:
 
                 self.s_accumulated[ii] = s_ii
-                self.loss_dict['residual_multinoulli_loss_lvl%d' % ii] = criterion(target, self.s_accumulated[ii])
+                self.loss_dict['residual_multinoulli_loss_lvl%d' % ii] = criterion(self.s_accumulated[ii], target)
 
             else:
 
-                self.s_accum[ii] = self.s_accum[ii+1] + s_ii
-                self.loss_dict['residual_multinoulli_loss_lvl%d' % ii] = criterion(target, self.s_accumulated[ii])
+                self.s_accumulated[ii] = self.s_accumulated[ii+1] + s_ii
+                self.loss_dict['residual_multinoulli_loss_lvl%d' % ii] = criterion(self.s_accumulated[ii], target)
 
             logging.info(' -- Added residual multinoulli loss at level %d' % (ii))
 
@@ -448,11 +450,14 @@ class PHISeg(nn.Module):
         )
 
         # Here we use the posterior sample sampled above
-        self.reconstruction = self.reconstruct(z_posterior=z_posterior)
+        self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior)
 
-        reconstruction_loss = self.residual_multinoulli_loss(input=self.reconstruction, target=segm)
+        reconstruction_loss = self.residual_multinoulli_loss(input=layer_reconstruction, target=segm)
 
         self.reconstruction_loss = torch.sum(reconstruction_loss)
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
 
         return -(self.reconstruction_loss + self.beta * self.kl)
+
+    def loss(self, segm):
+        return -self.elbo(segm)

@@ -9,13 +9,13 @@ log_dir_name = 'lidc'
 filter_channels = [32, 64, 128, 192]
 latent_levels = len(filter_channels) - 1
 
+n_classes = 2
 #
 use_reversible = False
 
 # use 1 for grayscale, 3 for RGB images
 input_channels = 1
-
-epochs_to_train = 10
+epochs_to_train = 50
 
 # model
 model = PHISeg

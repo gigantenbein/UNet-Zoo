@@ -43,18 +43,19 @@ def train(train_loader, epochs):
     logging.info('Starting training.')
     for epoch in range(epochs):
         for step, (patch, mask, _) in enumerate(train_loader):
-            print('step')
             patch = patch.to(device)
             mask = mask.to(device)
             mask = torch.unsqueeze(mask, 1)
 
             net.forward(patch, mask, training=True)
             loss = net.loss(mask)
-
+            #print('Epoch {} Step {} Loss {}'.format(epoch, step, loss))
+            #logging.info('Epoch {} Step {} Loss {}'.format(epoch, step, loss))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if step%100 == 0:
+            if step % 100 == 0:
+                logging.info('Epoch {} Step {} Loss {}'.format(epoch, step, loss))
                 logging.info('Epoch: {} Number of processed patches: {}'.format(epoch, step))
         logging.info('Finished epoch {}'.format(epoch))
     logging.info('Finished training.')
