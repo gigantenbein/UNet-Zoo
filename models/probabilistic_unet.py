@@ -6,6 +6,7 @@ from models.unet import Unet
 from utils import init_weights, init_weights_orthogonal_normal
 from torch.distributions import Normal, Independent, kl
 import numpy as np
+from utils import l2_regularisation
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -219,7 +220,7 @@ class ProbabilisticUnet(nn.Module):
         self.fcomb = Fcomb(self.num_filters, self.latent_dim, self.input_channels, self.num_classes,
                            self.no_convs_fcomb, {'w': 'orthogonal', 'b': 'normal'}, use_tile=True).to(device)
 
-    def forward(self, patch, segm, training=True):
+    def forward(self, patch, segm=None, training=True):
         """
         Construct prior latent space for patch and run patch through UNet,
         in case training is True also construct posterior latent space
@@ -295,3 +296,9 @@ class ProbabilisticUnet(nn.Module):
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
 
         return -(self.reconstruction_loss + self.beta * self.kl)
+
+    def loss(self, mask):
+        elbo = self.elbo(mask)
+        reg_loss = l2_regularisation(self.posterior) + l2_regularisation(self.prior) + l2_regularisation(
+            self.fcomb.layers)
+        loss = -elbo + 1e-5 * reg_loss

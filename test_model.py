@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 structures_dict = {1: 'RV', 2: 'Myo', 3: 'LV'}
 
 
-def main(model_path, exp_config, sys_config, do_plots=False):
+def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
 
     n_samples = 50
     model_selection = 'best_ged'
@@ -55,22 +55,27 @@ def main(model_path, exp_config, sys_config, do_plots=False):
     ged = 0
     for ii, (patch, mask, _) in enumerate(data):
 
+        patch.to(device)
+        mask.to(device)
         if ii % 10 == 0:
             logging.info("Progress: %d" % ii)
             print("Progress: {} GED: {}".format(ii, ged))
 
-        net.forward(patch, mask, training=False)
+        net.forward(patch, mask=mask, training=False)
         sample = net.sample(testing=True)
         ground_truth_label = mask
 
-        ged = utils.generalised_energy_distance(sample, ground_truth_label, 1, label_range=range(1,1))
+        ged = utils.generalised_energy_distance(sample, ground_truth_label, 1, label_range=range(1, 1))
         ged_list.append(ged)
 
-        n = min(mask.size(0), 8)
-        comparison = torch.cat([mask[1].view(1, 128, 128),
-                                sample[1].view(1, 128, 128)])
+        n = min(patch.size(0), 8)
+        comparison = torch.cat([patch[:n],
+                                mask.view(-1, 1, 128, 128)[:n],
+                                sample.view(-1, 1, 128, 128)[:n]])
         save_image(comparison.cpu(),
-                   'results/reconstruction_' + str(ii) + '.png', nrow=n)
+                   'segmentation/comp_' + str(ii) + '.png', nrow=n)
+
+
 
         #ncc = utils.variance_ncc_dist(sample, ground_truth_label)
         #ncc_list.append(ncc)
@@ -91,6 +96,46 @@ def main(model_path, exp_config, sys_config, do_plots=False):
    # np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_arr)
    # np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
 
+def test_segmentation():
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Get Data
+    net = exp_config.model(input_channels=exp_config.input_channels,
+                           num_classes=1,
+                           num_filters=exp_config.filter_channels,
+                           latent_dim=exp_config.latent_levels,
+                           no_convs_fcomb=4,
+                           beta=10.0,
+                           reversible=exp_config.use_reversible
+                           )
+
+    net.to(device)
+
+    model_name = exp_config.experiment_name + '.pth'
+    save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
+
+    map = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    net.load_state_dict(torch.load('/Users/marcgantenbein/scratch/ProbabilisticUnet.pth', map_location=map))
+    net.eval()
+
+    _, data = load_data_into_loader(sys_config)
+
+    for ii, (patch, mask, _) in enumerate(data):
+
+        if ii % 10 == 0:
+            logging.info("Progress: %d" % ii)
+            print("Progress: {} GED: {}".format(ii, ged))
+
+        net.forward(patch, mask, training=False)
+        sample = net.sample(testing=True)
+
+        n = min(patch.size(0), 8)
+        comparison = torch.cat([patch[:n],
+                                mask.view(-1, 1, 128, 128)[:n],
+                                sample.view(-1, 1, 128, 128)[:n]])
+        save_image(comparison.cpu(),
+                   'segmentation/comp_' + str(ii) + '.png', nrow=n)
 
 
 if __name__ == '__main__':

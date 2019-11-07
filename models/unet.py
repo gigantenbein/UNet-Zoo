@@ -105,7 +105,7 @@ class Unet(nn.Module):
 
     def __init__(self, input_channels, num_classes, num_filters,
                  initializers, apply_last_layer=True, padding=True,
-                 reversible=False):
+                 reversible=False, training=False):
         super(Unet, self).__init__()
         self.input_channels = input_channels
         self.num_classes = num_classes
@@ -114,6 +114,7 @@ class Unet(nn.Module):
         self.activation_maps = []
         self.apply_last_layer = apply_last_layer
         self.contracting_path = nn.ModuleList()
+        self.prediction = None
 
         for i in range(len(self.num_filters)):
             input = self.input_channels if i == 0 else output
@@ -140,7 +141,14 @@ class Unet(nn.Module):
             #nn.init.kaiming_normal_(self.last_layer.weight, mode='fan_in',nonlinearity='relu')
             #nn.init.normal_(self.last_layer.bias)
 
-    def forward(self, x, val):
+    def forward(self, x, mask=None, training=True, val=False):
+        """
+
+        :param x: image to segment
+        :param mask: mask which serves as a dummy argument for the forward method
+        :param val:
+        :return:
+        """
         blocks = []
 
         for i, down in enumerate(self.contracting_path):
@@ -160,4 +168,13 @@ class Unet(nn.Module):
         if self.apply_last_layer:
             x = self.last_layer(x)
 
+        self.prediction = x
         return x
+
+    def loss(self, mask):
+        CEloss = nn.CrossEntropyLoss()
+        loss = CEloss(
+            self.prediction,
+            mask.view(-1, 128, 128).long(),
+        )
+        return loss

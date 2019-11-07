@@ -5,7 +5,6 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision.utils import save_image
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
-from models.phiseg import PHISeg
 
 # Python bundle packages
 import os
@@ -16,10 +15,8 @@ import pickle
 
 # own files
 from load_LIDC_data import LIDC_IDRI
-from utils import l2_regularisation
 import argparse
 import utils
-from models.probabilistic_unet import ProbabilisticUnet
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
@@ -46,15 +43,14 @@ def train(train_loader, epochs):
     logging.info('Starting training.')
     for epoch in range(epochs):
         for step, (patch, mask, _) in enumerate(train_loader):
+            print('step')
             patch = patch.to(device)
             mask = mask.to(device)
             mask = torch.unsqueeze(mask, 1)
 
             net.forward(patch, mask, training=True)
-            elbo = net.elbo(mask)
-            reg_loss = l2_regularisation(net.posterior) + l2_regularisation(net.prior) + l2_regularisation(
-                net.fcomb.layers)
-            loss = -elbo + 1e-5 * reg_loss
+            loss = net.loss(mask)
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -64,33 +60,25 @@ def train(train_loader, epochs):
     logging.info('Finished training.')
 
 
-def test(test_loader):
-    net.eval()
-    test_loss = 0
-    with torch.no_grad():
-        for step, (patch, mask, _) in enumerate(test_loader):
-            patch = patch.to(device)
-            mask = mask.to(device)
+def train_det_unet(train_loader, epochs):
+    net.train()
+    train_loss = 0
 
-            net.forward(patch, mask, training=False)
+    for step, (patch, mask, _) in enumerate(train_loader):
+        patch = patch.to(device)
+        mask = mask.to(device)
+        mask = torch.unsqueeze(mask, 1)
+        prediction = net(patch)
 
-            prediction = net.unet_features
+        CEloss = nn.CrossEntropyLoss()
+        loss = CEloss(
+            prediction,
+            mask.view(-1, 128, 128).long(),
+        )
 
-            CEloss = nn.CrossEntropyLoss()
-            test_loss = CEloss(
-                prediction,
-                mask.view(-1, 128, 128).long(),
-            ).item()
-
-            n = min(patch.size(0), 8)
-            comparison = torch.cat([patch[:n],
-                                    mask.view(-1, 1, 128, 128)[:n],
-                                   prediction.view(-1, 1, 128, 128)[:n]])
-            save_image(comparison.cpu(),
-                       'segmentation/comp_' + str(step) + '.png', nrow=n)
-
-        test_loss /= len(test_loader.dataset)
-        print('====> Test set loss: {:.4f}'.format(test_loss))
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
 
 def load_dummy_dataset():
@@ -157,21 +145,26 @@ if __name__ == '__main__':
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    # net = exp_config.model(input_channels=exp_config.input_channels,
+    #                        num_classes=1,
+    #                        num_filters=exp_config.filter_channels,
+    #                        latent_dim=exp_config.latent_levels,
+    #                        no_convs_fcomb=4,
+    #                        beta=10.0,
+    #                        reversible=exp_config.use_reversible
+    #                        )
+
     net = exp_config.model(input_channels=exp_config.input_channels,
-                           num_classes=1,
+                           num_classes=2,
                            num_filters=exp_config.filter_channels,
-                           latent_dim=2,
-                           no_convs_fcomb=4,
-                           beta=10.0,
+                           initializers=None,
                            reversible=exp_config.use_reversible
                            )
-
-
 
     net.to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=0)
 
-    epochs = 100
+    epochs = exp_config.epochs_to_train
 
     if args.dummy == 'dummy':
         dummy_train()
