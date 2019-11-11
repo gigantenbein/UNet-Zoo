@@ -64,27 +64,6 @@ def train(train_loader, epochs):
     logging.info('Finished training.')
 
 
-def train_det_unet(train_loader, epochs):
-    net.train()
-    train_loss = 0
-
-    for step, (patch, mask, _) in enumerate(train_loader):
-        patch = patch.to(device)
-        mask = mask.to(device)
-        mask = torch.unsqueeze(mask, 1)
-        prediction = net(patch)
-
-        CEloss = nn.CrossEntropyLoss()
-        loss = CEloss(
-            prediction,
-            mask.view(-1, 128, 128).long(),
-        )
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-
 def load_dummy_dataset():
     with open(os.path.join(sys_config.data_root, 'dummy/dummy.pickle'), 'rb') as handle:
         dummy = pickle.load(handle)
