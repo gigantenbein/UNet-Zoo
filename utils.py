@@ -38,13 +38,6 @@ def l2_regularisation(m):
             l2_reg = l2_reg + W.norm(2)
     return l2_reg
 
-#import matplotlib.pyplot as plt
-# def save_mask_prediction_example(mask, pred, iter):
-# 	plt.imshow(pred[0,:,:],cmap='Greys')
-# 	plt.savefig('images/'+str(iter)+"_prediction.png")
-# 	plt.imshow(mask[0,:,:],cmap='Greys')
-# 	plt.savefig('images/'+str(iter)+"_mask.png")
-
 def ncc(a,v, zero_norm=True):
 
     a = a.flatten()
@@ -52,13 +45,13 @@ def ncc(a,v, zero_norm=True):
 
     if zero_norm:
 
-        a = (a - np.mean(a)) / (np.std(a) * len(a))
-        v = (v - np.mean(v)) / np.std(v)
+        a = (a - torch.mean(a)) / (torch.std(a) * len(a))
+        v = (v - torch.mean(v)) / torch.std(v)
 
     else:
 
-        a = (a) / (np.std(a) * len(a))
-        v = (v) / np.std(v)
+        a = (a) / (torch.std(a) * len(a))
+        v = (v) / torch.std(v)
 
     return np.correlate(a,v)
 
@@ -124,9 +117,9 @@ def variance_ncc_dist(sample_arr, gt_arr):
     def pixel_wise_xent(m_samp, m_gt, eps=1e-8):
 
 
-        log_samples = np.log(m_samp + eps)
+        log_samples = torch.log(m_samp + eps)
 
-        return -1.0*np.sum(m_gt*log_samples, axis=-1)
+        return -1.0*torch.sum(m_gt*log_samples, axis=-1)
 
     """
     :param sample_arr: expected shape N x X x Y 
@@ -143,21 +136,21 @@ def variance_ncc_dist(sample_arr, gt_arr):
     sX = sample_arr.shape[1]
     sY = sample_arr.shape[2]
 
-    E_ss_arr = np.zeros((N,sX,sY))
+    E_ss_arr = torch.zeros((N,sX,sY))
     for i in range(N):
         E_ss_arr[i,...] = pixel_wise_xent(sample_arr[i,...], mean_seg)
         # print('pixel wise xent')
         # plt.imshow( E_ss_arr[i,...])
         # plt.show()
 
-    E_ss = np.mean(E_ss_arr, axis=0)
+    E_ss = torch.mean(E_ss_arr, axis=0)
 
-    E_sy_arr = np.zeros((M,N, sX, sY))
+    E_sy_arr = torch.zeros((M,N, sX, sY))
     for j in range(M):
         for i in range(N):
             E_sy_arr[j,i, ...] = pixel_wise_xent(sample_arr[i,...], gt_arr[j,...])
 
-    E_sy = np.mean(E_sy_arr, axis=1)
+    E_sy = torch.mean(E_sy_arr, axis=1)
 
     ncc_list = []
     for j in range(M):

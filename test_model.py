@@ -31,6 +31,9 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
     net = exp_config.model(input_channels=exp_config.input_channels,
                            num_classes=2,
                            num_filters=exp_config.filter_channels,
+                           latent_dim=exp_config.latent_levels,
+                           no_convs_fcomb=4,
+                           beta=10.0,
                            reversible=exp_config.use_reversible
                            )
 
@@ -41,7 +44,7 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
 
     map = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net.load_state_dict(torch.load('/Users/marcgantenbein/PycharmProjects/UNet-Zoo/models/Unet.pth', map_location=map))
+    net.load_state_dict(torch.load(save_model_path, map_location=map))
     net.eval()
 
     _, data = load_data_into_loader(sys_config)
@@ -61,22 +64,38 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
                 print("Progress: {} GED: {}".format(ii, ged))
 
             net.forward(patch, mask=mask, training=False)
-            sample = net.sample(testing=True)
+            sample = torch.nn.functional.softmax(net.sample(testing=True))
             ground_truth_labels = masks.view(-1,1,128,128)
 
+            # Generalized energy distance
             ged = utils.generalised_energy_distance(sample, ground_truth_labels, 4, label_range=range(1, 5))
-            print(ged)
             ged_list.append(ged)
 
-            dice_list.append(dc(sample.view(-1, 128, 128).detach().numpy(), mask.view(-1, 128, 128).detach().numpy()))
+            # Dice coefficient
+            dice = dc(sample.view(-1, 128, 128).detach().numpy(), mask.view(-1, 128, 128).detach().numpy())
+            dice_list.append(dice)
 
-            #ncc = utils.variance_ncc_dist(sample, ground_truth_label)
-            #ncc_list.append(ncc)
+            # Normalised Cross correlation
+            ncc = utils.variance_ncc_dist(sample, ground_truth_labels)
+            ncc_list.append(ncc)
 
 
 
     ged_arr = np.asarray(ged_list)
     ncc_arr = np.asarray(ncc_list)
+    dice_arr = np.asarray(dice_list)
+
+    print('-- GED: --')
+    print(np.mean(ged_arr))
+    print(np.std(ged_arr))
+
+    print(' -- NCC: --')
+    print(np.mean(ncc_arr))
+    print(np.std(ncc_arr))
+
+    print(' -- Dice: --')
+    print(np.mean(dice_arr))
+    print(np.std(dice_arr))
 
     logging.info('-- GED: --')
     logging.info(np.mean(ged_arr))
@@ -85,6 +104,10 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
     logging.info('-- NCC: --')
     logging.info(np.mean(ncc_arr))
     logging.info(np.std(ncc_arr))
+
+    logging.info('-- Dice: --')
+    logging.info(np.mean(dice_arr))
+    logging.info(np.std(dice_arr))
 
    # np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_arr)
    # np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
@@ -144,6 +167,12 @@ if __name__ == '__main__':
     if args.LOCAL == 'local':
         print('Running with local configuration')
         import config.local_config as sys_config
+
+        fileh = logging.FileHandler('logfile', 'a')
+        log = logging.getLogger()  # root logger
+        for hdlr in log.handlers[:]:  # remove all old handlers
+            log.removeHandler(hdlr)
+        log.addHandler(fileh)
     else:
         import config.system as sys_config
 

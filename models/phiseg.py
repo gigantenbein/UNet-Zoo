@@ -402,7 +402,7 @@ class PHISeg(nn.Module):
                 prior_mu_list[ii],
                 prior_sigma_list[ii])
 
-            logging.info(' -- Added hierarchical loss with at level %d with alpha_%d=%d' % (ii,ii, level_weights[ii]))
+            #logging.info(' -- Added hierarchical loss with at level %d with alpha_%d=%d' % (ii,ii, level_weights[ii]))
 
             loss_tot += self.KL_divergence_loss_weight * self.loss_dict['KL_divergence_loss_lvl%d' % ii]
 
@@ -429,7 +429,7 @@ class PHISeg(nn.Module):
                 self.s_accumulated[ii] = self.s_accumulated[ii+1] + s_ii
                 self.loss_dict['residual_multinoulli_loss_lvl%d' % ii] = criterion(self.s_accumulated[ii], target)
 
-            logging.info(' -- Added residual multinoulli loss at level %d' % (ii))
+            #logging.info(' -- Added residual multinoulli loss at level %d' % (ii))
 
             loss_tot += self.residual_multinoulli_loss_weight * self.loss_dict['residual_multinoulli_loss_lvl%d' % ii]
         return loss_tot

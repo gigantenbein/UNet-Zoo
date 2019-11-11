@@ -283,6 +283,8 @@ class ProbabilisticUnet(nn.Module):
         """
 
         criterion = nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction=None)
+
+        criterion = nn.CrossEntropyLoss(size_average=False, reduce=False, reduction=None)
         z_posterior = self.posterior_latent_space.rsample()
 
         self.kl = torch.mean(
@@ -292,7 +294,7 @@ class ProbabilisticUnet(nn.Module):
         self.reconstruction = self.reconstruct(use_posterior_mean=reconstruct_posterior_mean, calculate_posterior=False,
                                                z_posterior=z_posterior)
 
-        reconstruction_loss = criterion(input=self.reconstruction, target=segm)
+        reconstruction_loss = criterion(input=self.reconstruction, target=segm.view(-1, 128, 128).long())
         self.reconstruction_loss = torch.sum(reconstruction_loss)
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
 
@@ -303,3 +305,4 @@ class ProbabilisticUnet(nn.Module):
         reg_loss = l2_regularisation(self.posterior) + l2_regularisation(self.prior) + l2_regularisation(
             self.fcomb.layers)
         loss = -elbo + 1e-5 * reg_loss
+        return loss

@@ -41,6 +41,8 @@ def load_data_into_loader(sys_config):
 def train(train_loader, epochs):
     net.train()
     logging.info('Starting training.')
+    scheduler = torch.optim.StepLR(optimizer, step_size=10, gamma=0.1)
+
     for epoch in range(epochs):
         for step, (patch, mask, _, __) in enumerate(train_loader):
             patch = patch.to(device)
@@ -54,6 +56,7 @@ def train(train_loader, epochs):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            scheduler.step()
             if step % 100 == 0:
                 logging.info('Epoch {} Step {} Loss {}'.format(epoch, step, loss))
                 logging.info('Epoch: {} Number of processed patches: {}'.format(epoch, step))
@@ -154,13 +157,6 @@ if __name__ == '__main__':
                            beta=10.0,
                            reversible=exp_config.use_reversible
                            )
-    #
-    # net = exp_config.model(input_channels=exp_config.input_channels,
-    #                        num_classes=2,
-    #                        num_filters=exp_config.filter_channels,
-    #                        initializers=None,
-    #                        reversible=exp_config.use_reversible
-    #                        )
 
     net.to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=0)
