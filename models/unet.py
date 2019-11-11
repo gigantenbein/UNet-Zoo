@@ -105,7 +105,7 @@ class Unet(nn.Module):
 
     def __init__(self, input_channels, num_classes, num_filters,
                  initializers=None, apply_last_layer=True, padding=True,
-                 reversible=False, training=False):
+                 reversible=False, training=False, latent_dim=3, no_convs_fcomb=4, beta=1.0):
         super(Unet, self).__init__()
         self.input_channels = input_channels
         self.num_classes = num_classes

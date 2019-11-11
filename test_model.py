@@ -6,7 +6,7 @@ import glob
 from importlib.machinery import SourceFileLoader
 import argparse
 # from sklearn.metrics import f1_score, classification_report, confusion_matrix
-# from medpy.metric import dc, assd, hd
+from medpy.metric import dc, assd, hd
 
 import utils
 
@@ -29,11 +29,8 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Get Data
     net = exp_config.model(input_channels=exp_config.input_channels,
-                           num_classes=1,
+                           num_classes=2,
                            num_filters=exp_config.filter_channels,
-                           latent_dim=2,
-                           no_convs_fcomb=4,
-                           beta=10.0,
                            reversible=exp_config.use_reversible
                            )
 
@@ -44,41 +41,37 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
 
     map = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net.load_state_dict(torch.load('/Users/marcgantenbein/scratch/ProbabilisticUnet.pth', map_location=map))
+    net.load_state_dict(torch.load('/Users/marcgantenbein/PycharmProjects/UNet-Zoo/models/Unet.pth', map_location=map))
     net.eval()
 
     _, data = load_data_into_loader(sys_config)
 
     ged_list = []
+    dice_list = []
     ncc_list = []
 
     ged = 0
-    for ii, (patch, mask, _) in enumerate(data):
+    with torch.no_grad():
+        for ii, (patch, mask, _, masks) in enumerate(data):
+            print('Step: {}'.format(ii))
+            patch.to(device)
+            mask.to(device)
+            if ii % 10 == 0:
+                logging.info("Progress: %d" % ii)
+                print("Progress: {} GED: {}".format(ii, ged))
 
-        patch.to(device)
-        mask.to(device)
-        if ii % 10 == 0:
-            logging.info("Progress: %d" % ii)
-            print("Progress: {} GED: {}".format(ii, ged))
+            net.forward(patch, mask=mask, training=False)
+            sample = net.sample(testing=True)
+            ground_truth_labels = masks.view(-1,1,128,128)
 
-        net.forward(patch, mask=mask, training=False)
-        sample = net.sample(testing=True)
-        ground_truth_label = mask
+            ged = utils.generalised_energy_distance(sample, ground_truth_labels, 4, label_range=range(1, 5))
+            print(ged)
+            ged_list.append(ged)
 
-        ged = utils.generalised_energy_distance(sample, ground_truth_label, 1, label_range=range(1, 1))
-        ged_list.append(ged)
+            dice_list.append(dc(sample.view(-1, 128, 128).detach().numpy(), mask.view(-1, 128, 128).detach().numpy()))
 
-        n = min(patch.size(0), 8)
-        comparison = torch.cat([patch[:n],
-                                mask.view(-1, 1, 128, 128)[:n],
-                                sample.view(-1, 1, 128, 128)[:n]])
-        save_image(comparison.cpu(),
-                   'segmentation/comp_' + str(ii) + '.png', nrow=n)
-
-
-
-        #ncc = utils.variance_ncc_dist(sample, ground_truth_label)
-        #ncc_list.append(ncc)
+            #ncc = utils.variance_ncc_dist(sample, ground_truth_label)
+            #ncc_list.append(ncc)
 
 
 
@@ -101,7 +94,7 @@ def test_segmentation(exp_config, sys_config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Get Data
     net = exp_config.model(input_channels=exp_config.input_channels,
-                           num_classes=1,
+                           num_classes=2,
                            num_filters=exp_config.filter_channels,
                            latent_dim=exp_config.latent_levels,
                            no_convs_fcomb=4,
@@ -111,31 +104,33 @@ def test_segmentation(exp_config, sys_config):
 
     net.to(device)
 
-    #model_name = exp_config.experiment_name + '.pth'
-    #save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
+    model_name = exp_config.experiment_name + '.pth'
+    save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
 
     map = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net.load_state_dict(torch.load('/Users/marcgantenbein/PycharmProjects/UNet-Zoo/models/ProbabilisticUnet.pth', map_location=map))
+    net.load_state_dict(torch.load(save_model_path, map_location=map))
     net.eval()
 
     _, data = load_data_into_loader(sys_config)
 
-    for ii, (patch, mask, _) in enumerate(data):
+    with torch.no_grad():
+        for ii, (patch, mask, _, masks) in enumerate(data):
 
-        if ii % 10 == 0:
-            logging.info("Progress: %d" % ii)
-            print("Progress: {}".format(ii))
+            if ii % 10 == 0:
+                logging.info("Progress: %d" % ii)
+                print("Progress: {}".format(ii))
 
-        net.forward(patch, mask, training=False)
-        sample = net.sample(testing=True)
+            net.forward(patch, mask, training=False)
+            sample = torch.nn.functional.softmax(net.sample(testing=True))
 
-        n = min(patch.size(0), 8)
-        comparison = torch.cat([patch[:n],
-                                mask.view(-1, 1, 128, 128)[:n],
-                                sample.view(-1, 1, 128, 128)[:n]])
-        save_image(comparison.cpu(),
-                   'segmentation/prob_unet/comp_' + str(ii) + '.png', nrow=n)
+            n = min(patch.size(0), 8)
+            comparison = torch.cat([patch[:n],
+                                     masks.view(-1, 1, 128, 128),
+                                     sample[0][1].view(-1,1,128,128)[:n]])
+            #comparison = sample.view(-1, 1, 128, 128)
+            save_image(comparison.cpu(),
+                       'segmentation/' + exp_config.experiment_name + '/comp_' + str(ii) + '.png', nrow=n)
 
 
 if __name__ == '__main__':
@@ -161,5 +156,8 @@ if __name__ == '__main__':
 
     exp_config = SourceFileLoader(config_module, os.path.join(config_file)).load_module()
 
+    utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
+
+    #test_quantitative(model_path, exp_config, sys_config)
     test_segmentation(exp_config, sys_config)
     #main(model_path, exp_config=exp_config, sys_config=sys_config, do_plots=False)

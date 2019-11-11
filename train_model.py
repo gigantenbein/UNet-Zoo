@@ -32,7 +32,7 @@ def load_data_into_loader(sys_config):
     train_sampler = SubsetRandomSampler(train_indices)
     test_sampler = SubsetRandomSampler(test_indices)
     train_loader = DataLoader(dataset, batch_size=5, sampler=train_sampler)
-    test_loader = DataLoader(dataset, batch_size=5, sampler=test_sampler)
+    test_loader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
     print("Number of training/test patches:", (len(train_indices),len(test_indices)))
 
     return train_loader, test_loader
@@ -42,7 +42,7 @@ def train(train_loader, epochs):
     net.train()
     logging.info('Starting training.')
     for epoch in range(epochs):
-        for step, (patch, mask, _) in enumerate(train_loader):
+        for step, (patch, mask, _, __) in enumerate(train_loader):
             patch = patch.to(device)
             mask = mask.to(device)
             mask = torch.unsqueeze(mask, 1)

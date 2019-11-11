@@ -48,6 +48,7 @@ class LIDC_IDRI(Dataset):
 
         #Randomly select one of the four labels for this image
         label = self.labels[index][random.randint(0,3)].astype(float)
+        labels_ = self.labels[index]
         if self.transform is not None:
             image = self.transform(image)
 
@@ -56,12 +57,14 @@ class LIDC_IDRI(Dataset):
         # Convert image and label to torch tensors
         image = torch.from_numpy(image)
         label = torch.from_numpy(label)
+        labels_ = torch.from_numpy(np.array(labels_))
 
         #Convert uint8 to float tensors
         image = image.type(torch.FloatTensor)
         label = label.type(torch.FloatTensor)
+        labels_ = labels_.type(torch.FloatTensor)
 
-        return image, label, series_uid
+        return image, label, series_uid, labels_
 
     # Override to give PyTorch size of dataset
     def __len__(self):

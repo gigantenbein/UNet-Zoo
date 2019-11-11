@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
+from medpy.metric import jc
 
 import numpy as np
 import os
@@ -66,6 +67,7 @@ def generalised_energy_distance(sample_arr, gt_arr, nlabels=1, **kwargs):
     def dist_fct(m1, m2):
 
         label_range = kwargs.get('label_range', range(nlabels))
+        label_range = range(1, 5)
 
         per_label_iou = []
         for lbl in label_range:
@@ -74,12 +76,12 @@ def generalised_energy_distance(sample_arr, gt_arr, nlabels=1, **kwargs):
             m1_bin = (m1 == lbl)*1
             m2_bin = (m2 == lbl)*1
 
-            if np.sum(m1_bin) == 0 and np.sum(m2_bin) == 0:
+            if torch.sum(m1_bin) == 0 and torch.sum(m2_bin) == 0:
                 per_label_iou.append(1)
-            elif np.sum(m1_bin) > 0 and np.sum(m2_bin) == 0 or np.sum(m1_bin) == 0 and np.sum(m2_bin) > 0:
+            elif torch.sum(m1_bin) > 0 and torch.sum(m2_bin) == 0 or torch.sum(m1_bin) == 0 and torch.sum(m2_bin) > 0:
                 per_label_iou.append(0)
             else:
-                per_label_iou.append(jc(m1_bin, m2_bin))
+                per_label_iou.append(jc(m1_bin.numpy(), m2_bin.numpy()))
 
         # print(1-(sum(per_label_iou) / nlabels))
 
