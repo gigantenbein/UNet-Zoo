@@ -21,6 +21,53 @@ import utils
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 
+class UNetModel:
+    def __init__(self, exp_config):
+
+        self.net = exp_config.model(input_channels=exp_config.input_channels,
+                                    num_classes=exp_config.nclasses,
+                                    num_filters=exp_config.filter_channels,
+                                    latent_dim=exp_config.latent_levels,
+                                    no_convs_fcomb=exp_config.no_convs_fcomb,
+                                    beta=exp_config.beta,
+                                    reversible=exp_config.use_reversible
+                                    )
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.net.to(self.device)
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-4, weight_decay=0)
+
+        self.epochs = exp_config.epochs_to_train
+
+    def train(self, train_loader):
+        self.net.train()
+        logging.info('Starting training.')
+        scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=10, gamma=0.1)
+
+        for epoch in range(self.epochs):
+            for step, (patch, mask, _, __) in enumerate(train_loader):
+                patch = patch.to(self.device)
+                mask = mask.to(self.device)
+                mask = torch.unsqueeze(mask, 1)
+
+                self.net.forward(patch, mask, training=True)
+                loss = self.net.loss(mask)
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+                scheduler.step()
+                if step % 100 == 0:
+                    logging.info('Epoch {} Step {} Loss {}'.format(epoch, step, loss))
+                    logging.info('Epoch: {} Number of processed patches: {}'.format(epoch, step))
+            logging.info('Finished epoch {}'.format(epoch))
+        logging.info('Finished training.')
+
+    def validate(self):
+        pass
+
+
+
+
+
 def load_data_into_loader(sys_config):
     dataset = LIDC_IDRI(dataset_location=sys_config.data_root)
 
@@ -36,30 +83,6 @@ def load_data_into_loader(sys_config):
     print("Number of training/test patches:", (len(train_indices),len(test_indices)))
 
     return train_loader, test_loader
-
-
-def train(train_loader, epochs):
-    net.train()
-    logging.info('Starting training.')
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-
-    for epoch in range(epochs):
-        for step, (patch, mask, _, __) in enumerate(train_loader):
-            patch = patch.to(device)
-            mask = mask.to(device)
-            mask = torch.unsqueeze(mask, 1)
-
-            net.forward(patch, mask, training=True)
-            loss = net.loss(mask)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
-            if step % 100 == 0:
-                logging.info('Epoch {} Step {} Loss {}'.format(epoch, step, loss))
-                logging.info('Epoch: {} Number of processed patches: {}'.format(epoch, step))
-        logging.info('Finished epoch {}'.format(epoch))
-    logging.info('Finished training.')
 
 
 def load_dummy_dataset():
@@ -79,9 +102,9 @@ def dummy_train():
     print(net)
     net.forward(patch, mask, training=True)
     elbo = net.elbo(mask)
-    # reg_loss = l2_regularisation(net.posterior) + l2_regularisation(net.prior) + l2_regularisation(
-    #     net.fcomb.layers)
-    # loss = -elbo + 1e-5 * reg_loss
+    reg_loss = l2_regularisation(net.posterior) + l2_regularisation(net.prior) + l2_regularisation(
+        net.fcomb.layers)
+    loss = -elbo + 1e-5 * reg_loss
     loss = -elbo
     optimizer.zero_grad()
     loss.backward()
@@ -124,27 +147,13 @@ if __name__ == '__main__':
     logging.info(' *** Running Experiment: %s', exp_config.experiment_name)
     logging.info('**************************************************************')
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    net = exp_config.model(input_channels=exp_config.input_channels,
-                           num_classes=2,
-                           num_filters=exp_config.filter_channels,
-                           latent_dim=exp_config.latent_levels,
-                           no_convs_fcomb=4,
-                           beta=10.0,
-                           reversible=exp_config.use_reversible
-                           )
-
-    net.to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=0)
-
-    epochs = exp_config.epochs_to_train
+    model = UNetModel(exp_config)
 
     if args.dummy == 'dummy':
         dummy_train()
     else:
         train_loader, test_loader = load_data_into_loader(sys_config)
-        train(train_loader, epochs)
+        model.train(train_loader)
 
     logging.info('Finished training the model.')
 

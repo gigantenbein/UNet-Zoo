@@ -332,15 +332,23 @@ class PHISeg(nn.Module):
 
     def sample_prior(self):
         z_sample = [None] * self.latent_levels
-        mu = self.posterior_mu
-        sigma = self.posterior_sigma
+        mu = self.prior_mu
+        sigma = self.prior_sigma
         for i, _ in enumerate(z_sample):
             z_sample[i] = mu[i] + sigma[i] * torch.randn_like(sigma[i])
         return z_sample
 
-    def reconstruct(self, z_posterior):
+    def sample(self, testing=True):
+        # TODO: Debug
+        if testing:
+            sample, _ = self.reconstruct(self.sample_prior(), use_softmax=False)
+            return sample
+        else:
+            raise NotImplementedError
+
+    def reconstruct(self, z_posterior, use_softmax=True):
         layer_recon = self.likelihood(z_posterior)
-        return self.accumulate_output(layer_recon), layer_recon
+        return self.accumulate_output(layer_recon, use_softmax=use_softmax), layer_recon
 
     def forward(self, patch, mask, training=True):
         if training:
