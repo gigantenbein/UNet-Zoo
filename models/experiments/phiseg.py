@@ -10,6 +10,9 @@ filter_channels = [32, 64, 128, 192]
 latent_levels = len(filter_channels) - 1
 
 n_classes = 1
+
+no_convs_fcomb = 4 # not used
+beta = 10.0 # not used
 #
 use_reversible = False
 

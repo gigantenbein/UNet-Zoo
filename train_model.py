@@ -25,7 +25,7 @@ class UNetModel:
     def __init__(self, exp_config):
 
         self.net = exp_config.model(input_channels=exp_config.input_channels,
-                                    num_classes=exp_config.nclasses,
+                                    num_classes=exp_config.n_classes,
                                     num_filters=exp_config.filter_channels,
                                     latent_dim=exp_config.latent_levels,
                                     no_convs_fcomb=exp_config.no_convs_fcomb,
