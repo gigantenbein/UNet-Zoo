@@ -51,8 +51,6 @@ def train(train_loader, epochs):
 
             net.forward(patch, mask, training=True)
             loss = net.loss(mask)
-            #print('Epoch {} Step {} Loss {}'.format(epoch, step, loss))
-            #logging.info('Epoch {} Step {} Loss {}'.format(epoch, step, loss))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

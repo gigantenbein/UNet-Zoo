@@ -15,7 +15,7 @@ use_reversible = False
 
 # use 1 for grayscale, 3 for RGB images
 input_channels = 1
-epochs_to_train = 50
+epochs_to_train = 5
 
 # model
 model = PHISeg
