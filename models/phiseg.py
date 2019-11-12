@@ -339,7 +339,6 @@ class PHISeg(nn.Module):
         return z_sample
 
     def sample(self, testing=True):
-        # TODO: Debug
         if testing:
             sample, _ = self.reconstruct(self.sample_prior(), use_softmax=False)
             return sample

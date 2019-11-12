@@ -284,7 +284,7 @@ class ProbabilisticUnet(nn.Module):
 
         criterion = nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction=None)
 
-        criterion = nn.CrossEntropyLoss(size_average=False, reduce=False, reduction=None)
+        #criterion = nn.CrossEntropyLoss(size_average=False, reduce=False, reduction=None)
         z_posterior = self.posterior_latent_space.rsample()
 
         self.kl = torch.mean(
