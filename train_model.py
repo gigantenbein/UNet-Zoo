@@ -41,7 +41,7 @@ def load_data_into_loader(sys_config):
 def train(train_loader, epochs):
     net.train()
     logging.info('Starting training.')
-    scheduler = torch.optim.StepLR(optimizer, step_size=10, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     for epoch in range(epochs):
         for step, (patch, mask, _, __) in enumerate(train_loader):
