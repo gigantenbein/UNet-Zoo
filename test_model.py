@@ -22,14 +22,13 @@ structures_dict = {1: 'RV', 2: 'Myo', 3: 'LV'}
 
 
 def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
-
     n_samples = 50
     model_selection = 'best_ged'
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Get Data
     net = exp_config.model(input_channels=exp_config.input_channels,
-                           num_classes=2,
+                           num_classes=exp_config.n_classes,
                            num_filters=exp_config.filter_channels,
                            latent_dim=exp_config.latent_levels,
                            no_convs_fcomb=4,
@@ -112,12 +111,12 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
    # np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_arr)
    # np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
 
-def test_segmentation(exp_config, sys_config):
 
+def test_segmentation(exp_config, sys_config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Get Data
     net = exp_config.model(input_channels=exp_config.input_channels,
-                           num_classes=2,
+                           num_classes=exp_config.n_classes,
                            num_filters=exp_config.filter_channels,
                            latent_dim=exp_config.latent_levels,
                            no_convs_fcomb=4,

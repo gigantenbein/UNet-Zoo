@@ -32,6 +32,7 @@ class UNetModel:
                                     beta=exp_config.beta,
                                     reversible=exp_config.use_reversible
                                     )
+        self.exp_config = exp_config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-4, weight_decay=0)
@@ -60,6 +61,12 @@ class UNetModel:
                     logging.info('Epoch: {} Number of processed patches: {}'.format(epoch, step))
             logging.info('Finished epoch {}'.format(epoch))
         logging.info('Finished training.')
+
+    def save_model(self):
+        model_name = self.exp_config.experiment_name + '.pth'
+        save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
+        torch.save(self.net.state_dict(), save_model_path)
+        logging.info('saved model to .pth file in {}'.format(save_model_path))
 
     def validate(self):
         pass
@@ -148,17 +155,11 @@ if __name__ == '__main__':
     logging.info('**************************************************************')
 
     model = UNetModel(exp_config)
-
     if args.dummy == 'dummy':
         dummy_train()
     else:
         train_loader, test_loader = load_data_into_loader(sys_config)
         model.train(train_loader)
 
-    logging.info('Finished training the model.')
-
-    model_name = exp_config.experiment_name + '.pth'
-    save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
-    torch.save(net.state_dict(), save_model_path)
-    logging.info('saved model to .pth file in {}'.format(save_model_path))
+    model.save_model()
 
