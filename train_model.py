@@ -1,7 +1,6 @@
 import torch
 import numpy as np
-from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler
+
 from torchvision.utils import save_image
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
@@ -14,9 +13,10 @@ from importlib.machinery import SourceFileLoader
 import pickle
 
 # own files
-from load_LIDC_data import LIDC_IDRI
+from load_LIDC_data import load_data_into_loader
 import argparse
 import utils
+from test_model import test_segmentation
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
@@ -61,6 +61,8 @@ class UNetModel:
                     logging.info('Epoch: {} Number of processed patches: {}'.format(epoch, step))
             logging.info('Finished epoch {}'.format(epoch))
         logging.info('Finished training.')
+        logging.info('Starting validation')
+        self.validate()
 
     def save_model(self):
         model_name = self.exp_config.experiment_name + '.pth'
@@ -68,28 +70,12 @@ class UNetModel:
         torch.save(self.net.state_dict(), save_model_path)
         logging.info('saved model to .pth file in {}'.format(save_model_path))
 
+    def test(self):
+        # test_quantitative(model_path, exp_config, sys_config)
+        test_segmentation(exp_config, sys_config, 10)
+
     def validate(self):
         pass
-
-
-
-
-
-def load_data_into_loader(sys_config):
-    dataset = LIDC_IDRI(dataset_location=sys_config.data_root)
-
-    dataset_size = len(dataset)
-    indices = list(range(dataset_size))
-    split = int(np.floor(0.1 * dataset_size))
-    np.random.shuffle(indices)
-    train_indices, test_indices = indices[split:], indices[:split]
-    train_sampler = SubsetRandomSampler(train_indices)
-    test_sampler = SubsetRandomSampler(test_indices)
-    train_loader = DataLoader(dataset, batch_size=5, sampler=train_sampler)
-    test_loader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
-    print("Number of training/test patches:", (len(train_indices),len(test_indices)))
-
-    return train_loader, test_loader
 
 
 def load_dummy_dataset():
@@ -158,8 +144,11 @@ if __name__ == '__main__':
     if args.dummy == 'dummy':
         dummy_train()
     else:
-        train_loader, test_loader = load_data_into_loader(sys_config)
-        model.train(train_loader)
+        #train_loader, test_loader = load_data_into_loader(sys_config)
+        utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
+       # model.train(train_loader)
+        model.test()
+
 
     model.save_model()
 

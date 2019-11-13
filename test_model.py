@@ -13,7 +13,7 @@ import utils
 # if not sys_config.running_on_gpu_host:
 #     import matplotlib.pyplot as plt
 
-from train_model import load_data_into_loader
+from load_LIDC_data import load_data_into_loader
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
@@ -112,7 +112,7 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
    # np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
 
 
-def test_segmentation(exp_config, sys_config):
+def test_segmentation(exp_config, sys_config, amount_of_tests=1000):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Get Data
     net = exp_config.model(input_channels=exp_config.input_channels,
@@ -139,6 +139,8 @@ def test_segmentation(exp_config, sys_config):
     with torch.no_grad():
         for ii, (patch, mask, _, masks) in enumerate(data):
 
+            if ii > amount_of_tests:
+                break
             if ii % 10 == 0:
                 logging.info("Progress: %d" % ii)
                 print("Progress: {}".format(ii))
@@ -149,7 +151,7 @@ def test_segmentation(exp_config, sys_config):
             n = min(patch.size(0), 8)
             comparison = torch.cat([patch[:n],
                                      masks.view(-1, 1, 128, 128),
-                                     sample[0][1].view(-1,1,128,128)[:n]])
+                                     sample.view(-1, 1, 128, 128)[:n]])
             #comparison = sample.view(-1, 1, 128, 128)
             save_image(comparison.cpu(),
                        'segmentation/' + exp_config.experiment_name + '/comp_' + str(ii) + '.png', nrow=n)
@@ -166,12 +168,6 @@ if __name__ == '__main__':
     if args.LOCAL == 'local':
         print('Running with local configuration')
         import config.local_config as sys_config
-
-        fileh = logging.FileHandler('logfile', 'a')
-        log = logging.getLogger()  # root logger
-        for hdlr in log.handlers[:]:  # remove all old handlers
-            log.removeHandler(hdlr)
-        log.addHandler(fileh)
     else:
         import config.system as sys_config
 
@@ -184,8 +180,5 @@ if __name__ == '__main__':
 
     exp_config = SourceFileLoader(config_module, os.path.join(config_file)).load_module()
 
-    utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
 
-    #test_quantitative(model_path, exp_config, sys_config)
-    test_segmentation(exp_config, sys_config)
     #main(model_path, exp_config=exp_config, sys_config=sys_config, do_plots=False)

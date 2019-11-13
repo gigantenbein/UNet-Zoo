@@ -5,6 +5,26 @@ import numpy as np
 import os
 import random
 import pickle
+from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
+
+
+def load_data_into_loader(sys_config):
+    dataset = LIDC_IDRI(dataset_location=sys_config.data_root)
+
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    split = int(np.floor(0.1 * dataset_size))
+    np.random.shuffle(indices)
+    train_indices, test_indices = indices[split:], indices[:split]
+    train_sampler = SubsetRandomSampler(train_indices)
+    test_sampler = SubsetRandomSampler(test_indices)
+    train_loader = DataLoader(dataset, batch_size=5, sampler=train_sampler)
+    test_loader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
+    print("Number of training/test patches:", (len(train_indices),len(test_indices)))
+
+    return train_loader, test_loader
+
 
 class LIDC_IDRI(Dataset):
     images = []
