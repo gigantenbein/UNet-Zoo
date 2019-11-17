@@ -51,6 +51,7 @@ class UNetModel:
         self.epochs = exp_config.epochs_to_train
 
         self.dice_mean = 0
+        self.val_loss = 0
 
     def train(self, train_loader, validation_loader):
         self.net.train()
@@ -114,8 +115,8 @@ class UNetModel:
                 val_mask = val_mask.to(self.device)  # N,H,W
                 val_mask = torch.unsqueeze(val_mask, 1)  # N,1,H,W
 
-                self.net.forward(val_patch, val_mask, training=False)
-                val_loss = self.net.loss(self.mask)
+                self.net.forward(val_patch, val_mask, training=True)
+                self.val_loss = self.net.loss(val_mask)
 
                 sample = torch.sigmoid(self.net.sample(testing=True))
                 sample = torch.chunk(sample, 2, dim=1)[0]
@@ -140,7 +141,7 @@ class UNetModel:
 
             logging.info('Validation took {} seconds'.format(time.time()-time_))
             self.dice_mean = np.asarray(dice_list).mean()
-            logging.info(dice_mean)
+            logging.info(self.dice_mean)
 
             self.net.train()
 
@@ -159,6 +160,7 @@ class UNetModel:
             # add current loss
             self.writer.add_scalar('Loss of current batch', self.loss, global_step=self.step)
             self.writer.add_scalar('Dice score of last validation', self.dice_mean, global_step=self.step)
+            self.writer.add_scalar('Validation loss of last validation', self.val_loss, global_step=self.step)
 
 
 
