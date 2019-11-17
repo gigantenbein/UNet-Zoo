@@ -60,13 +60,13 @@ class UNetModel:
         for epoch in range(self.epochs):
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
 
-                self.patch = patch.to(self.device)
-                self.mask = mask.to(self.device)  # N,H,W
-                self.mask = torch.unsqueeze(mask, 1)  # N,1,H,W
-                self.masks = masks
+                patch = patch.to(self.device)
+                mask = mask.to(self.device)  # N,H,W
+                mask = torch.unsqueeze(mask, 1)  # N,1,H,W
+                masks = masks.to(self.device)
 
-                self.net.forward(self.patch, self.mask, training=True)
-                self.loss = self.net.loss(self.mask)
+                self.net.forward(patch, mask, training=True)
+                self.loss = self.net.loss(mask)
                 self.optimizer.zero_grad()
                 self.loss.backward()
                 self.optimizer.step()
