@@ -65,6 +65,10 @@ class UNetModel:
                 mask = torch.unsqueeze(mask, 1)  # N,1,H,W
                 masks = masks.to(self.device)
 
+                self.mask = mask
+                self.patch = patch
+                self.masks = masks
+
                 self.net.forward(patch, mask, training=True)
                 self.loss = self.net.loss(mask)
                 self.optimizer.zero_grad()
