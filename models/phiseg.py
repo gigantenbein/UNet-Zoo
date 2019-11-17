@@ -420,7 +420,8 @@ class PHISeg(nn.Module):
         target = target.view(-1, 128, 128).long()
         #criterion = torch.nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction='sum')
 
-        criterion = torch.nn.CrossEntropyLoss(reduction='sum')
+        # TODO: equivalent to tf.reduce_mean(tf.reduce_sum(CE_with_logits(), axis=1)
+        criterion = torch.nn.CrossEntropyLoss(reduction='mean')
         for ii, s_ii in zip(reversed(range(self.latent_levels)),
                             reversed(input)):
 
@@ -453,7 +454,7 @@ class PHISeg(nn.Module):
         )
 
         # Here we use the posterior sample sampled above
-        self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior)
+        self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior, use_softmax=False)
 
         reconstruction_loss = self.residual_multinoulli_loss(input=layer_reconstruction, target=segm)
 

@@ -9,21 +9,45 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-def load_data_into_loader(sys_config):
-    dataset = LIDC_IDRI(dataset_location=sys_config.data_root)
+def load_data_into_loader(sys_config, name):
+    location = os.path.join(sys_config.data_root, name)
+    dataset = LIDC_IDRI(dataset_location=location)
 
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(0.1 * dataset_size))
     np.random.shuffle(indices)
-    train_indices, test_indices = indices[split:], indices[:split]
+
+    train_indices, test_indices, val_indices = indices[2*split:], indices[2*split:3*split], indices[:split]
+
     train_sampler = SubsetRandomSampler(train_indices)
     test_sampler = SubsetRandomSampler(test_indices)
+    val_sampler = SubsetRandomSampler(val_indices)
     train_loader = DataLoader(dataset, batch_size=5, sampler=train_sampler)
     test_loader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
-    print("Number of training/test patches:", (len(train_indices),len(test_indices)))
+    validation_loader = DataLoader(dataset, batch_size=5, sampler=val_sampler)
+    print("Number of training/test/validation patches:", (len(train_indices),len(test_indices), len(val_indices)))
 
-    return train_loader, test_loader
+    return train_loader, test_loader, validation_loader
+
+
+def create_pickle_data_with_n_samples(sys_config, n=100):
+    dataset = LIDC_IDRI(dataset_location=sys_config.data_root)
+
+    print('Create pickle file with {} samples'.format(n))
+    data_list = []
+    for i in range(n):
+        values = {}
+        values['image'] = dataset.images[n]
+        values['masks'] = dataset.labels[n]
+        values['series_uid'] = dataset.series_uid[n]
+
+        data_list.append(values)
+
+    data_list = dict(zip(list(range(n)), data_list))
+
+    with open('lidc_data_length_{}.pickle'.format(n), 'wb') as file:
+        pickle.dump(data_list, file)
 
 
 class LIDC_IDRI(Dataset):

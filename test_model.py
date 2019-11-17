@@ -146,12 +146,13 @@ def test_segmentation(exp_config, sys_config, amount_of_tests=1000):
                 print("Progress: {}".format(ii))
 
             net.forward(patch, mask, training=False)
-            sample = torch.nn.functional.softmax(net.sample(testing=True))
+            sample = torch.sigmoid(net.sample())
 
+           # sample = torch.where(sample > 0.5, 1, 0)
             n = min(patch.size(0), 8)
             comparison = torch.cat([patch[:n],
                                      masks.view(-1, 1, 128, 128),
-                                     sample.view(-1, 1, 128, 128)[:n]])
+                                     sample[:n]])
             #comparison = sample.view(-1, 1, 128, 128)
             save_image(comparison.cpu(),
                        'segmentation/' + exp_config.experiment_name + '/comp_' + str(ii) + '.png', nrow=n)
@@ -180,5 +181,8 @@ if __name__ == '__main__':
 
     exp_config = SourceFileLoader(config_module, os.path.join(config_file)).load_module()
 
+    utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
 
+    #test_quantitative(model_path, exp_config, sys_config)
+    test_segmentation(exp_config, sys_config)
     #main(model_path, exp_config=exp_config, sys_config=sys_config, do_plots=False)

@@ -53,7 +53,8 @@ def ncc(a,v, zero_norm=True):
         a = (a) / (torch.std(a) * len(a))
         v = (v) / torch.std(v)
 
-    return np.correlate(a,v)
+    return np.correlate(a, v)
+
 
 def generalised_energy_distance(sample_arr, gt_arr, nlabels=1, **kwargs):
 
@@ -127,7 +128,7 @@ def variance_ncc_dist(sample_arr, gt_arr):
     :return: 
     """
 
-    #mean_seg = np.mean(sample_arr, axis=0)
+    mean_seg = np.mean(sample_arr, axis=0)
     mean_seg = sample_arr
 
     N = sample_arr.shape[0]
@@ -137,8 +138,7 @@ def variance_ncc_dist(sample_arr, gt_arr):
     sY = sample_arr.shape[2]
 
     E_ss_arr = torch.zeros((N,sX,sY))
-    for i in range(N):
-        E_ss_arr[i,...] = pixel_wise_xent(sample_arr[i,...], mean_seg)
+    # for i in range(N):
         # print('pixel wise xent')
         # plt.imshow( E_ss_arr[i,...])
         # plt.show()
