@@ -132,7 +132,7 @@ class UNetModel:
                 #ged_list.append(ged)
 
                 # Dice coefficient
-                dice = dc(sample.detach().numpy(), val_mask.detach().numpy())
+                dice = dc(sample.detach().cpu().numpy(), val_mask.detach().cpu().numpy())
                 dice_list.append(dice)
 
                 # Normalised Cross correlation

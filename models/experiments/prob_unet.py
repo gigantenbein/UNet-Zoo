@@ -17,10 +17,10 @@ use_reversible = False
 # use 1 for grayscale, 3 for RGB images
 input_channels = 1
 
-epochs_to_train = 1
+epochs_to_train = 20
 
-logging_frequency = 1
-validation_frequency = 1
+logging_frequency = 250
+validation_frequency = 1000
 
 # model
 model = ProbabilisticUnet
