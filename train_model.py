@@ -57,7 +57,7 @@ class UNetModel:
         self.net.train()
         logging.info('Starting training.')
 
-        for epoch in range(self.epochs):
+        for self.epoch in range(self.epochs):
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
 
                 patch = patch.to(self.device)
@@ -76,10 +76,10 @@ class UNetModel:
                 self.optimizer.step()
 
                 if self.step % exp_config.logging_frequency == 0:
-                    logging.info('Epoch {} Step {} Loss {}'.format(epoch, self.step, self.loss))
-                    logging.info('Epoch: {} Number of processed patches: {}'.format(epoch, self.step))
-                    print('Epoch {} Step {} Loss {}'.format(epoch, self.step, self.loss))
-                    print('Epoch: {} Number of processed patches: {}'.format(epoch, self.step))
+                    logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                    logging.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
+                    print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                    print('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
                     self._create_tensorboard_summary()
                 if self.step % exp_config.validation_frequency == 0:
                     self.validate(validation_loader)
@@ -87,8 +87,8 @@ class UNetModel:
 
                 self.scheduler.step(self.loss)
 
-            logging.info('Finished epoch {}'.format(epoch))
-            print('Finished epoch {}'.format(epoch))
+            logging.info('Finished epoch {}'.format(self.epoch))
+            print('Finished epoch {}'.format(self.epoch))
         logging.info('Finished training.')
         logging.info('Starting validation')
         #self.validate()
@@ -154,17 +154,23 @@ class UNetModel:
 
             # plot images of current patch for summary
 
-            self.writer.add_image('Mask', self.mask, global_step=self.step, dataformats='NCHW')
-            self.writer.add_image('Patch', self.patch, global_step=self.step, dataformats='NCHW')
+            self.writer.add_image('Mask from Epoch {}'.format(self.epoch),
+                                  self.mask, global_step=self.step, dataformats='NCHW')
+            self.writer.add_image('Patch from Epoch {}'.format(self.epoch),
+                                  self.patch, global_step=self.step, dataformats='NCHW')
 
             sample = torch.sigmoid(self.net.sample())
             sample = torch.chunk(sample, 2, dim=1)[0]
-            self.writer.add_image('Sample', sample, global_step=self.step, dataformats='NCHW')
+            self.writer.add_image('Sample from Epoch {}'.format(self.epoch),
+                                  sample, global_step=self.step, dataformats='NCHW')
 
             # add current loss
-            self.writer.add_scalar('Loss of current batch', self.loss, global_step=self.step)
-            self.writer.add_scalar('Dice score of last validation', self.dice_mean, global_step=self.step)
-            self.writer.add_scalar('Validation loss of last validation', self.val_loss, global_step=self.step)
+            self.writer.add_scalar('Loss of current batch from Epoch {}'.format(self.epoch),
+                                   self.loss, global_step=self.step)
+            self.writer.add_scalar('Dice score of last validation from Epoch {}'.format(self.epoch),
+                                   self.dice_mean, global_step=self.step)
+            self.writer.add_scalar('Validation loss of last validation from Epoch {}'.format(self.epoch),
+                                   self.val_loss, global_step=self.step)
 
 
 
@@ -213,6 +219,6 @@ if __name__ == '__main__':
         train_loader, test_loader, validation_loader = load_data_into_loader(sys_config,'')
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
-        model.test()
+        model.save_model()
 
     model.save_model()

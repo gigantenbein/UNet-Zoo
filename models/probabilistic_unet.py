@@ -282,10 +282,10 @@ class ProbabilisticUnet(nn.Module):
         Calculate the evidence lower bound of the log-likelihood of P(Y|X)
         """
 
-        #criterion = nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction=None)
+        criterion = nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction=None)
 
         # performs log_softmax + NLLloss
-        criterion = nn.CrossEntropyLoss(reduction='none') # equivalent to arguments above
+        #criterion = nn.CrossEntropyLoss(reduction='none')  # equivalent to arguments above
 
 
         #criterion = nn.CrossEntropyLoss(size_average=False, reduction=None)
