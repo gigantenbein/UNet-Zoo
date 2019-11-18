@@ -45,7 +45,7 @@ class UNetModel:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-4, weight_decay=0)
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience=10)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience=100)
 
         self.writer = SummaryWriter()
         self.epochs = exp_config.epochs_to_train
@@ -71,6 +71,7 @@ class UNetModel:
 
                 self.net.forward(patch, mask, training=True)
                 self.loss = self.net.loss(mask)
+                logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                 self.optimizer.zero_grad()
                 self.loss.backward()
                 self.optimizer.step()
@@ -154,20 +155,20 @@ class UNetModel:
 
             # plot images of current patch for summary
 
-            self.writer.add_image('Mask from Epoch {}'.format(self.epoch),
+            self.writer.add_image('Mask_from_Epoch_{}'.format(self.epoch),
                                   self.mask, global_step=self.step, dataformats='NCHW')
-            self.writer.add_image('Patch from Epoch {}'.format(self.epoch),
+            self.writer.add_image('Patch_from_Epoch_{}'.format(self.epoch),
                                   self.patch, global_step=self.step, dataformats='NCHW')
 
             sample = torch.sigmoid(self.net.sample())
             sample = torch.chunk(sample, 2, dim=1)[0]
-            self.writer.add_image('Sample from Epoch {}'.format(self.epoch),
+            self.writer.add_image('Sample_from_Epoch_{}'.format(self.epoch),
                                   sample, global_step=self.step, dataformats='NCHW')
 
             # add current loss
-            self.writer.add_scalar('Loss of current batch from Epoch {}'.format(self.epoch),
+            self.writer.add_scalar('Loss_of_current_batch_from_Epoch_{}'.format(self.epoch),
                                    self.loss, global_step=self.step)
-            self.writer.add_scalar('Dice score of last validation from Epoch {}'.format(self.epoch),
+            self.writer.add_scalar('Dice_score_of_last_validation_from_Epoch_{}'.format(self.epoch),
                                    self.dice_mean, global_step=self.step)
             self.writer.add_scalar('Validation loss of last validation from Epoch {}'.format(self.epoch),
                                    self.val_loss, global_step=self.step)
