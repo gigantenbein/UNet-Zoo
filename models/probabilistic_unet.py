@@ -282,7 +282,7 @@ class ProbabilisticUnet(nn.Module):
         Calculate the evidence lower bound of the log-likelihood of P(Y|X)
         """
 
-        criterion = nn.BCEWithLogitsLoss(reduction=None)
+        criterion = nn.BCEWithLogitsLoss(reduction='none')
         z_posterior = self.posterior_latent_space.rsample()
 
         self.kl = torch.mean(
