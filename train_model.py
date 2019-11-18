@@ -170,7 +170,7 @@ class UNetModel:
                                    self.loss, global_step=self.step)
             self.writer.add_scalar('Dice_score_of_last_validation_from_Epoch_{}'.format(self.epoch),
                                    self.dice_mean, global_step=self.step)
-            self.writer.add_scalar('Validation loss of last validation from Epoch {}'.format(self.epoch),
+            self.writer.add_scalar('Validation_loss_of_last_validation_from_Epoch_{}'.format(self.epoch),
                                    self.val_loss, global_step=self.step)
 
 
