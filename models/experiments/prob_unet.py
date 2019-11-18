@@ -15,7 +15,7 @@ beta = 10.0 # for loss function
 use_reversible = False
 
 # use 1 for grayscale, 3 for RGB images
-# input_channels = 1
+input_channels = 1
 
 epochs_to_train = 20
 
