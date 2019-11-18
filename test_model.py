@@ -134,7 +134,7 @@ def test_segmentation(exp_config, sys_config, amount_of_tests=1000):
     net.load_state_dict(torch.load(save_model_path, map_location=map))
     net.eval()
 
-    _, data = load_data_into_loader(sys_config)
+    _, data, val_data = load_data_into_loader(sys_config,'')
 
     with torch.no_grad():
         for ii, (patch, mask, _, masks) in enumerate(data):
