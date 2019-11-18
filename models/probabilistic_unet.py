@@ -282,13 +282,7 @@ class ProbabilisticUnet(nn.Module):
         Calculate the evidence lower bound of the log-likelihood of P(Y|X)
         """
 
-        #criterion = nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction=None)
-        criterion = nn.BCEWithLogitsLoss(reduction='none')
-        # performs log_softmax + NLLloss
-        criterion1 = nn.CrossEntropyLoss(reduction='none')  # equivalent to arguments above
-
-
-        #criterion = nn.CrossEntropyLoss(size_average=False, reduction=None)
+        criterion = nn.BCEWithLogitsLoss(reduction=None)
         z_posterior = self.posterior_latent_space.rsample()
 
         self.kl = torch.mean(
@@ -298,11 +292,7 @@ class ProbabilisticUnet(nn.Module):
         self.reconstruction = self.reconstruct(use_posterior_mean=reconstruct_posterior_mean, calculate_posterior=False,
                                                z_posterior=z_posterior)
 
-        #inverse_mask = torch.ones_like(segm)-segm
-        #two_class_mask = torch.cat((segm, inverse_mask), dim=1)
         reconstruction_loss = criterion(input=self.reconstruction, target=segm)
-        #reconstruction_loss = criterion1(input=self.reconstruction, target=segm.view(-1, 128, 128).long())
-
         self.reconstruction_loss = torch.sum(reconstruction_loss)
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
 
