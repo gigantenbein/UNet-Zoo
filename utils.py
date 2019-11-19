@@ -165,13 +165,15 @@ def show_tensor(tensor):
     with torch.no_grad():
         import matplotlib.pyplot as plt
         tensor = tensor.detach()
-        if tensor.shape[2] != 128:
-            raise NotImplementedError
+
+        height = tensor.shape[2]
+        width = tensor.shape[3]
+
         batch_size = tensor.shape[0]
 
-        result = tensor[0].view(128,128)
+        result = tensor[0].view(height, width)
         for i in range(1, batch_size):
-            result = torch.cat([result, tensor[i].view(128, 128)], dim=1)
+            result = torch.cat([result, tensor[i].view(height, width)], dim=1)
 
         plt.imshow(result, cmap='Greys_r')
 

@@ -66,7 +66,6 @@ class UNetModel:
                 mask = torch.unsqueeze(mask, 1)  # N,1,H,W
                 masks = masks.to(self.device)
 
-                utils.show_tensor(mask)
                 self.mask = mask
                 self.patch = patch
                 self.masks = masks
@@ -158,14 +157,14 @@ class UNetModel:
             # plot images of current patch for summary
             sample = torch.sigmoid(self.net.sample())
             sample = torch.chunk(sample, 2, dim=1)[0]
-            forward_pass = torch.sigmoid(self.net.forward(self.patch, self.mask, training=False))
+
             #sample = torch.round(sample + 0.3)
 
             self.writer.add_image('Patch/GT/Sample_from_Epoch_{}'.format(self.epoch),
                                   torch.cat([self.patch, self.mask.view(-1, 1, 128, 128),
                                              sample], dim=2), global_step=self.step, dataformats='NCHW')
-            self.writer.add_image('Deep_Supervision_from_Epoch_{}'.format(self.epoch),
-                                  forward_pass, global_step=self.step, dataformats='NCHW')
+            # self.writer.add_image('Deep_Supervision_from_Epoch_{}'.format(self.epoch),
+            #                       forward_pass, global_step=self.step, dataformats='NCHW')
             # add current loss
             self.writer.add_scalar('Loss_of_current_batch_from_Epoch_{}'.format(self.epoch),
                                    self.loss, global_step=self.step)

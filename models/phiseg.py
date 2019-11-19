@@ -8,9 +8,35 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 # TODO: only debugging
 from utils import show_tensor
 
+
+class Conv2D(nn.Module):
+    def __init__(self, input_dim, output_dim, stride=1, kernel_size=3, padding=1, activation=torch.nn.ReLU, norm=torch.nn.BatchNorm2d,
+                 norm_before_activation=True):
+        super(Conv2D, self).__init__()
+
+        if kernel_size == 3:
+            padding = 1
+        else:
+            padding = 0
+
+        layers = []
+        layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=kernel_size, padding=padding, stride=stride))
+        if norm_before_activation:
+            layers.append(norm(num_features=output_dim))
+            layers.append(activation())
+        else:
+            layers.append(activation())
+            layers.append(norm(num_features=output_dim))
+
+        self.convolution = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.convolution(x)
+
+
 class Conv2DSequence(nn.Module):
     """Block with 2D convolutions after each other with ReLU activation"""
-    def __init__(self, input_dim, output_dim, kernel=3, depth=2):
+    def __init__(self, input_dim, output_dim, kernel=3, depth=2, activation=torch.nn.ReLU, norm=torch.nn.BatchNorm2d, norm_before_activation=True):
         super(Conv2DSequence, self).__init__()
 
         assert depth >= 1
@@ -20,12 +46,10 @@ class Conv2DSequence(nn.Module):
             padding = 0
 
         layers = []
-        layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=kernel, padding=padding))
-        layers.append(nn.ReLU())
+        layers.append(Conv2D(input_dim, output_dim, kernel_size=kernel, padding=padding, activation=activation, norm=norm))
 
         for i in range(depth-1):
-            layers.append(nn.Conv2d(output_dim, output_dim, kernel_size=kernel, padding=padding))
-            layers.append(nn.ReLU())
+            layers.append(Conv2D(output_dim, output_dim, kernel_size=kernel, padding=padding, activation=activation, norm=norm))
 
         self.convolution = nn.Sequential(*layers)
 
@@ -44,13 +68,11 @@ class DownConvolutionalBlock(nn.Module):
         if pool:
             layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
-        layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
-        layers.append(nn.ReLU(inplace=True))
+        layers.append(Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
 
         if depth > 1:
             for i in range(depth-1):
-                layers.append(nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
-                layers.append(nn.ReLU(inplace=True))
+                layers.append(Conv2D(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
 
         self.layers = nn.Sequential(*layers)
 
@@ -72,11 +94,9 @@ class UpConvolutionalBlock(nn.Module):
 
         if self.bilinear:
             self.upconv_layer = nn.Sequential(
-                nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(),
-                nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(),
-            )
+                Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=1),
+                Conv2D(output_dim, output_dim, kernel_size=3, stride=1, padding=1),
+                )
         else:
             raise NotImplementedError
 
@@ -103,15 +123,13 @@ class SampleZBlock(nn.Module):
 
         layers = []
         for i in range(depth):
-            layers.append(nn.Conv2d(input_dim, input_dim, kernel_size=3, padding=1))
-            layers.append(nn.ReLU())
+            layers.append(Conv2D(input_dim, input_dim, kernel_size=3, padding=1))
 
         self.conv = nn.Sequential(*layers)
 
-        self.mu_conv = nn.Sequential(nn.Conv2d(input_dim, z_dim0, kernel_size=1),
-                                     nn.ReLU())
+        self.mu_conv = nn.Sequential(nn.Conv2d(input_dim, z_dim0, kernel_size=1))
         self.sigma_conv = nn.Sequential(nn.Conv2d(input_dim, z_dim0, kernel_size=1),
-                                        nn.ReLU())
+                                        nn.Softplus())
 
     def forward(self, pre_z):
         pre_z = self.conv(pre_z)
@@ -158,7 +176,8 @@ class Likelihood(nn.Module):
         output = self.num_classes
         for i in range(self.latent_levels, 0, -1):
             input = self.num_filters[i-1]
-            self.s_layer.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2, kernel=1))
+            self.s_layer.append(Conv2DSequence(
+                input_dim=input, output_dim=output, depth=1, kernel=1, activation=torch.nn.Identity, norm=torch.nn.Identity))
 
     def forward(self, z):
         """Likelihood network which takes list of latent variables z with dimension latent_levels"""
@@ -168,12 +187,15 @@ class Likelihood(nn.Module):
 
         # start from the downmost layer and the last filter
         for i in range(self.latent_levels):
+            assert z[-i-1].shape[1] == 2
+            assert z[-i-1].shape[2] == 128 * 2**(-self.latent_levels + i)
             post_z[-i - 1] = self.likelihood_ups_path[i](z[-i - 1])
             post_z[-i - 1] = nn.functional.interpolate(
                 post_z[-i - 1],
                 mode='bilinear',
                 scale_factor=2,
                 align_corners=True)
+            assert post_z[-i - 1].shape[2] == 128 * 2 ** (-self.latent_levels + i + 1)
             post_z[-i - 1] = self.likelihood_post_ups_path[i](post_z[-i - 1])
 
         post_c[self.latent_levels - 1] = post_z[self.latent_levels - 1]
@@ -187,12 +209,14 @@ class Likelihood(nn.Module):
 
             assert post_z[i].shape[3] == ups_below.shape[3]
             assert post_z[i].shape[2] == ups_below.shape[2]
+
+            # Reminder: Pytorch standard is NCHW, TF NHWC
             concat = torch.cat([post_z[i], ups_below], dim=1)
 
             post_c[i] = self.likelihood_post_c_path[-i-1](concat)
 
         for i, block in enumerate(self.s_layer):
-            s_in = block(post_c[-i-1])
+            s_in = block(post_c[-i-1]) # no activation in the last layer
             s[-i-1] = torch.nn.functional.interpolate(s_in, size=[128, 128], mode='nearest')
 
         return s
@@ -324,6 +348,9 @@ class PHISeg(nn.Module):
         self.likelihood = Likelihood(input_channels, num_classes, num_filters, initializers=None, apply_last_layer=True, padding=True)
         self.prior = Posterior(input_channels, num_classes, num_filters, initializers=None, padding=True, is_posterior=False)
 
+        self.s_out_list = [None] * self.latent_levels
+        self.s_out_list_with_softmax = [None] * self.latent_levels
+
     def sample_posterior(self):
         z_sample = [None] * self.latent_levels
         mu = self.posterior_mu
@@ -355,11 +382,13 @@ class PHISeg(nn.Module):
     def forward(self, patch, mask, training=True):
         if training:
             self.posterior_latent_space, self.posterior_mu, self.posterior_sigma = self.posterior(patch, mask)
+            self.s_out_list = self.likelihood(self.posterior_latent_space)
 
         self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch)
-        self.segm_vector = self.likelihood(self.prior_latent_space)
+        if not training:
+            self.s_out_list = self.likelihood(self.prior_latent_space)
 
-        return self.segm_vector
+        return self.s_out_list
 
     def accumulate_output(self, output_list, use_softmax=False):
         s_accum = output_list[-1]
@@ -416,7 +445,7 @@ class PHISeg(nn.Module):
 
         return loss_tot
 
-    def residual_multinoulli_loss(self, input, target):
+    def residual_multinoulli_loss(self, reconstruction, target):
 
         self.s_accumulated = [None] * self.latent_levels
         loss_tot = 0
@@ -426,7 +455,7 @@ class PHISeg(nn.Module):
         # TODO: equivalent to tf.reduce_mean(tf.reduce_sum(CE_with_logits(), axis=1)
         criterion = torch.nn.BCEWithLogitsLoss(reduction='mean')
         for ii, s_ii in zip(reversed(range(self.latent_levels)),
-                            reversed(input)):
+                            reversed(reconstruction)):
 
             if ii == self.latent_levels-1:
 
@@ -459,7 +488,7 @@ class PHISeg(nn.Module):
         # Here we use the posterior sample sampled above
         self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior, use_softmax=False)
 
-        reconstruction_loss = self.residual_multinoulli_loss(input=layer_reconstruction, target=segm)
+        reconstruction_loss = self.residual_multinoulli_loss(reconstruction=layer_reconstruction, target=segm)
 
         self.reconstruction_loss = torch.sum(reconstruction_loss)
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
