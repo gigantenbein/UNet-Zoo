@@ -20,8 +20,8 @@ use_reversible = False
 input_channels = 1
 epochs_to_train = 20
 
-logging_frequency = 10
-validation_frequency = 100
+logging_frequency = 100
+validation_frequency = 1000
 
 # model
 model = PHISeg
