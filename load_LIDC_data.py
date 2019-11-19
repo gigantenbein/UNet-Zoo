@@ -25,7 +25,7 @@ def load_data_into_loader(sys_config, name):
     val_sampler = SubsetRandomSampler(val_indices)
     train_loader = DataLoader(dataset, batch_size=5, sampler=train_sampler)
     test_loader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
-    validation_loader = DataLoader(dataset, batch_size=5, sampler=val_sampler)
+    validation_loader = DataLoader(dataset, batch_size=1, sampler=val_sampler)
     print("Number of training/test/validation patches:", (len(train_indices),len(test_indices), len(val_indices)))
 
     return train_loader, test_loader, validation_loader
@@ -38,15 +38,15 @@ def create_pickle_data_with_n_samples(sys_config, n=100):
     data_list = []
     for i in range(n):
         values = {}
-        values['image'] = dataset.images[n]
-        values['masks'] = dataset.labels[n]
-        values['series_uid'] = dataset.series_uid[n]
+        values['image'] = dataset.images[i]
+        values['masks'] = dataset.labels[i]
+        values['series_uid'] = dataset.series_uid[i]
 
         data_list.append(values)
 
     data_list = dict(zip(list(range(n)), data_list))
 
-    with open('lidc_data_length_{}.pickle'.format(n), 'wb') as file:
+    with open('/Users/marcgantenbein/scratch/data/size1000/lidc_data_length_{}.pickle'.format(n), 'wb') as file:
         pickle.dump(data_list, file)
 
 

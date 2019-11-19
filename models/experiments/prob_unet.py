@@ -19,8 +19,8 @@ input_channels = 1
 
 epochs_to_train = 20
 
-logging_frequency = 250
-validation_frequency = 1000
+logging_frequency = 1
+validation_frequency = 100
 
 # model
 model = ProbabilisticUnet

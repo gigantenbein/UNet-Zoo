@@ -417,11 +417,11 @@ class PHISeg(nn.Module):
 
         self.s_accumulated = [None] * self.latent_levels
         loss_tot = 0
-        target = target.view(-1, 128, 128).long()
+        #target = target.view(-1, 128, 128).long()
         #criterion = torch.nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction='sum')
 
         # TODO: equivalent to tf.reduce_mean(tf.reduce_sum(CE_with_logits(), axis=1)
-        criterion = torch.nn.CrossEntropyLoss(reduction='mean')
+        criterion = torch.nn.BCEWithLogitsLoss(reduction='mean')
         for ii, s_ii in zip(reversed(range(self.latent_levels)),
                             reversed(input)):
 

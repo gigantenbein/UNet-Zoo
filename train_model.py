@@ -14,6 +14,7 @@ from importlib.machinery import SourceFileLoader
 import argparse
 import time
 from medpy.metric import dc
+import math
 
 # own files
 from load_LIDC_data import load_data_into_loader, create_pickle_data_with_n_samples
@@ -45,7 +46,8 @@ class UNetModel:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-4, weight_decay=0)
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience=100)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, 'min', min_lr=1e-6, verbose=True, patience=100)
 
         self.writer = SummaryWriter()
         self.epochs = exp_config.epochs_to_train
@@ -59,7 +61,6 @@ class UNetModel:
 
         for self.epoch in range(self.epochs):
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
-
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
                 mask = torch.unsqueeze(mask, 1)  # N,1,H,W
@@ -71,11 +72,12 @@ class UNetModel:
 
                 self.net.forward(patch, mask, training=True)
                 self.loss = self.net.loss(mask)
+                assert math.isnan(self.loss) == False
                 logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                 self.optimizer.zero_grad()
                 self.loss.backward()
                 self.optimizer.step()
-
+                print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                 if self.step % exp_config.logging_frequency == 0:
                     logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                     logging.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
@@ -126,7 +128,7 @@ class UNetModel:
                 sample = torch.sigmoid(self.net.sample(testing=True))
                 sample = torch.chunk(sample, 2, dim=1)[0]
 
-                sample = sample.round()
+                sample = torch.round(sample+0.4)
 
                 # Generalized energy distance
                 #ged = utils.generalised_energy_distance(sample, self.masks, 4, label_range=range(1, 5))
@@ -154,16 +156,13 @@ class UNetModel:
         with torch.no_grad():
 
             # plot images of current patch for summary
-
-            self.writer.add_image('Mask_from_Epoch_{}'.format(self.epoch),
-                                  self.mask, global_step=self.step, dataformats='NCHW')
-            self.writer.add_image('Patch_from_Epoch_{}'.format(self.epoch),
-                                  self.patch, global_step=self.step, dataformats='NCHW')
-
             sample = torch.sigmoid(self.net.sample())
             sample = torch.chunk(sample, 2, dim=1)[0]
-            self.writer.add_image('Sample_from_Epoch_{}'.format(self.epoch),
-                                  sample, global_step=self.step, dataformats='NCHW')
+            #sample = torch.round(sample + 0.3)
+
+            self.writer.add_image('Patch/GT/Sample_from_Epoch_{}'.format(self.epoch),
+                                  torch.cat([self.patch, self.mask.view(-1, 1, 128, 128),
+                                             sample], dim=2), global_step=self.step, dataformats='NCHW')
 
             # add current loss
             self.writer.add_scalar('Loss_of_current_batch_from_Epoch_{}'.format(self.epoch),
@@ -172,10 +171,6 @@ class UNetModel:
                                    self.dice_mean, global_step=self.step)
             self.writer.add_scalar('Validation_loss_of_last_validation_from_Epoch_{}'.format(self.epoch),
                                    self.val_loss, global_step=self.step)
-
-
-
-
 
 
 if __name__ == '__main__':
@@ -212,12 +207,12 @@ if __name__ == '__main__':
 
     model = UNetModel(exp_config)
     if args.dummy == 'dummy':
-        train_loader, test_loader, validation_loader = load_data_into_loader(sys_config, 'size10/')
+        #create_pickle_data_with_n_samples(sys_config,1000)
+        train_loader, test_loader, validation_loader = load_data_into_loader(sys_config, 'size1000/')
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
-        model.test()
     else:
-        train_loader, test_loader, validation_loader = load_data_into_loader(sys_config,'')
+        train_loader, test_loader, validation_loader = load_data_into_loader(sys_config, '')
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
         model.save_model()
