@@ -160,6 +160,22 @@ def variance_ncc_dist(sample_arr, gt_arr):
     return (1/M)*sum(ncc_list)
 
 
+def show_tensor(tensor):
+    """Show images with matplotlib for debugging, only for 128,128"""
+    with torch.no_grad():
+        import matplotlib.pyplot as plt
+        tensor = tensor.detach()
+        if tensor.shape[2] != 128:
+            raise NotImplementedError
+        batch_size = tensor.shape[0]
+
+        result = tensor[0].view(128,128)
+        for i in range(1, batch_size):
+            result = torch.cat([result, tensor[i].view(128, 128)], dim=1)
+
+        plt.imshow(result, cmap='Greys_r')
+
+
 def makefolder(folder):
     '''
     Helper function to make a new folder if doesn't exist

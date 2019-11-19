@@ -5,6 +5,9 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
+# TODO: only debugging
+from utils import show_tensor
+
 class Conv2DSequence(nn.Module):
     """Block with 2D convolutions after each other with ReLU activation"""
     def __init__(self, input_dim, output_dim, kernel=3, depth=2):
@@ -184,7 +187,7 @@ class Likelihood(nn.Module):
 
             assert post_z[i].shape[3] == ups_below.shape[3]
             assert post_z[i].shape[2] == ups_below.shape[2]
-            concat = torch.cat([post_z[i], ups_below], 1)
+            concat = torch.cat([post_z[i], ups_below], dim=1)
 
             post_c[i] = self.likelihood_post_c_path[-i-1](concat)
 
@@ -358,7 +361,7 @@ class PHISeg(nn.Module):
 
         return self.segm_vector
 
-    def accumulate_output(self, output_list, use_softmax=True):
+    def accumulate_output(self, output_list, use_softmax=False):
         s_accum = output_list[-1]
         for i in range(len(output_list) - 1):
             s_accum += output_list[i]
