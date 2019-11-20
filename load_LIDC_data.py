@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-def load_data_into_loader(sys_config, name):
+def load_data_into_loader(sys_config, name, batch_size):
     location = os.path.join(sys_config.data_root, name)
     dataset = LIDC_IDRI(dataset_location=location)
 
@@ -23,10 +23,10 @@ def load_data_into_loader(sys_config, name):
     train_sampler = SubsetRandomSampler(train_indices)
     test_sampler = SubsetRandomSampler(test_indices)
     val_sampler = SubsetRandomSampler(val_indices)
-    train_loader = DataLoader(dataset, batch_size=5, sampler=train_sampler)
-    test_loader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
-    validation_loader = DataLoader(dataset, batch_size=1, sampler=val_sampler)
-    print("Number of training/test/validation patches:", (len(train_indices),len(test_indices), len(val_indices)))
+    train_loader = DataLoader(dataset, batch_size=batch_size[0], sampler=train_sampler)
+    test_loader = DataLoader(dataset, batch_size=batch_size[1], sampler=test_sampler)
+    validation_loader = DataLoader(dataset, batch_size=batch_size[2], sampler=val_sampler)
+    print("Number of training/test/validation patches:", (len(train_indices), len(test_indices), len(val_indices)))
 
     return train_loader, test_loader, validation_loader
 

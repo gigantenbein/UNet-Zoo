@@ -18,9 +18,10 @@ use_reversible = False
 input_channels = 1
 
 epochs_to_train = 20
+batch_size = [5, 1, 5]
 
-logging_frequency = 100
-validation_frequency = 1000
+logging_frequency = 10
+validation_frequency = 100
 
 # model
 model = ProbabilisticUnet

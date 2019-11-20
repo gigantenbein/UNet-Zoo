@@ -127,10 +127,10 @@ class UNetModel:
                 sample = torch.sigmoid(self.net.sample(testing=True))
                 sample = torch.chunk(sample, 2, dim=1)[0]
 
-                sample = torch.round(sample+0.4)
+                sample_arrangement = [torch.sigmoid(self.net.sample(testing=True)) for i in range(4)]
 
                 # Generalized energy distance
-                #ged = utils.generalised_energy_distance(sample, self.masks, 4, label_range=range(1, 5))
+                #ged = utils.generalised_energy_distance(sample_arrangement, self.masks, 4, label_range=range(1, 5))
                 #ged_list.append(ged)
 
                 # Dice coefficient
@@ -158,7 +158,7 @@ class UNetModel:
             sample = torch.sigmoid(self.net.sample())
             sample = torch.chunk(sample, 2, dim=1)[0]
 
-            #sample = torch.round(sample + 0.3)
+            sample = torch.round(sample)
 
             self.writer.add_image('Patch/GT/Sample_from_Epoch_{}'.format(self.epoch),
                                   torch.cat([self.patch, self.mask.view(-1, 1, 128, 128),
@@ -210,11 +210,13 @@ if __name__ == '__main__':
     model = UNetModel(exp_config)
     if args.dummy == 'dummy':
         #create_pickle_data_with_n_samples(sys_config,1000)
-        train_loader, test_loader, validation_loader = load_data_into_loader(sys_config, 'size1000/')
+        train_loader, test_loader, validation_loader = load_data_into_loader(
+            sys_config, 'size1000/', batch_size=exp_config.batch_size)
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
     else:
-        train_loader, test_loader, validation_loader = load_data_into_loader(sys_config, '')
+        train_loader, test_loader, validation_loader = load_data_into_loader(
+            sys_config, '', batch_size=exp_config.batch_size)
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
         model.save_model()

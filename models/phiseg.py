@@ -336,7 +336,7 @@ class PHISeg(nn.Module):
         self.loss_dict={}
         self.KL_divergence_loss_weight = 1.0
 
-        self.beta = 10.0
+        self.beta = 1.0
 
         self.padding = padding
         self.activation_maps = []
@@ -427,9 +427,9 @@ class PHISeg(nn.Module):
         loss_tot = 0
 
         if self.exponential_weighting:
-            level_weights = [4**i for i in list(range(self.latent_levels))]
+            level_weights = [4 ** i for i in list(range(self.latent_levels))]
         else:
-            level_weights = [1]*self.latent_levels
+            level_weights = [1] * self.exp_config.latent_levels
 
         for ii, mu_i, sigma_i in zip(reversed(range(self.latent_levels)),
                                      reversed(posterior_mu_list),
@@ -481,9 +481,7 @@ class PHISeg(nn.Module):
 
         z_posterior = self.sample_posterior()
 
-        self.kl = torch.mean(
-            self.kl_divergence()
-        )
+        self.kl = self.kl_divergence()
 
         # Here we use the posterior sample sampled above
         self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior, use_softmax=False)
@@ -493,7 +491,7 @@ class PHISeg(nn.Module):
         self.reconstruction_loss = torch.sum(reconstruction_loss)
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
 
-        return -(self.reconstruction_loss + self.beta * self.kl)
+        return self.reconstruction_loss + self.beta * self.kl
 
     def loss(self, segm):
-        return -self.elbo(segm)
+        return self.elbo(segm)
