@@ -162,7 +162,7 @@ class UNetModel:
             sample = torch.sigmoid(self.net.sample())
             sample = torch.chunk(sample, 2, dim=1)[0]
 
-            sample = torch.round(sample)
+            #sample = torch.round(sample)
 
             self.writer.add_image('Patch/GT/Sample_from_Epoch_{}'.format(self.epoch),
                                   torch.cat([self.patch, self.mask.view(-1, 1, 128, 128),
