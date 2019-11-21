@@ -334,7 +334,7 @@ class PHISeg(nn.Module):
         self.latent_levels = (len(self.num_filters) - 1)
 
         self.loss_dict={}
-        self.KL_divergence_loss_weight = 1.0
+        self.kl_divergence_loss_weight = 1.0
 
         self.beta = 1.0
 
@@ -441,7 +441,7 @@ class PHISeg(nn.Module):
                 prior_mu_list[ii],
                 prior_sigma_list[ii])
 
-            loss_tot += self.KL_divergence_loss_weight * self.loss_dict['KL_divergence_loss_lvl%d' % ii]
+            loss_tot += self.kl_divergence_loss_weight * self.loss_dict['KL_divergence_loss_lvl%d' % ii]
 
         return loss_tot
 
