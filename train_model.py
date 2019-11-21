@@ -63,6 +63,7 @@ class UNetModel:
         logging.info('Starting training.')
 
         for self.epoch in range(self.epochs):
+            self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
@@ -164,7 +165,7 @@ class UNetModel:
     def _create_tensorboard_summary(self):
         with torch.no_grad():
 
-            self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
+
             # plot images of current patch for summary
             sample = torch.sigmoid(self.net.sample())
             sample = torch.chunk(sample, 2, dim=1)[0]
@@ -174,9 +175,7 @@ class UNetModel:
             self.current_writer.add_image('Patch/GT/Sample',
                                   torch.cat([self.patch, self.mask.view(-1, 1, 128, 128),
                                              sample], dim=2), global_step=self.step, dataformats='NCHW')
-            # self.writer.add_image('Deep_Supervision_from_Epoch_{}'.format(self.epoch),
-            #                       forward_pass, global_step=self.step, dataformats='NCHW')
-            # add current loss
+
             self.current_writer.add_scalar('Total_loss', self.loss, global_step=self.step)
             self.current_writer.add_scalar('KL_Divergence', self.kl_loss, global_step=self.step)
             self.current_writer.add_scalar('Reconstruction_loss', self.reconstruction_loss, global_step=self.step)
@@ -221,7 +220,7 @@ if __name__ == '__main__':
     model = UNetModel(exp_config)
     if args.dummy == 'dummy':
         train_loader, test_loader, validation_loader = load_data_into_loader(
-            sys_config, 'size10/', batch_size=exp_config.batch_size)
+            sys_config, 'size1000/', batch_size=exp_config.batch_size)
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
     else:

@@ -285,7 +285,7 @@ class ProbabilisticUnet(nn.Module):
         criterion = nn.BCEWithLogitsLoss(reduction='none')
         z_posterior = self.posterior_latent_space.rsample()
 
-        self.kl = torch.mean(
+        self.kl_divergence_loss = torch.mean(
             self.kl_divergence(analytic=analytic_kl, calculate_posterior=False, z_posterior=z_posterior))
 
         # Here we use the posterior sample sampled above
@@ -296,7 +296,7 @@ class ProbabilisticUnet(nn.Module):
         self.reconstruction_loss = torch.sum(reconstruction_loss)
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
 
-        return -(self.reconstruction_loss + self.beta * self.kl)
+        return -(self.reconstruction_loss + self.beta * self.kl_divergence_loss)
 
     def loss(self, mask):
         elbo = self.elbo(mask)

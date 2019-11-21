@@ -342,6 +342,7 @@ class PHISeg(nn.Module):
         self.activation_maps = []
         self.apply_last_layer = apply_last_layer
         self.exponential_weighting = exponential_weighting
+        self.exponential_weight = 2 # default was 4
         self.residual_multinoulli_loss_weight = 1.0
 
         self.kl_divergence_loss = 0
@@ -430,7 +431,7 @@ class PHISeg(nn.Module):
         loss_tot = 0
 
         if self.exponential_weighting:
-            level_weights = [4 ** i for i in list(range(self.latent_levels))]
+            level_weights = [self.exponential_weight ** i for i in list(range(self.latent_levels))]
         else:
             level_weights = [1] * self.exp_config.latent_levels
 
