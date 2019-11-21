@@ -164,11 +164,9 @@ class UNetModel:
 
     def _create_tensorboard_summary(self):
         with torch.no_grad():
-
-
             # plot images of current patch for summary
             sample = torch.sigmoid(self.net.sample())
-            sample = torch.chunk(sample, 2, dim=1)[0]
+            sample = torch.chunk(sample, 2, dim=1)[1]
 
             #sample = torch.round(sample)
 

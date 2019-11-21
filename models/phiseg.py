@@ -342,7 +342,7 @@ class PHISeg(nn.Module):
         self.activation_maps = []
         self.apply_last_layer = apply_last_layer
         self.exponential_weighting = exponential_weighting
-        self.exponential_weight = 2 # default was 4
+        self.exponential_weight = 4 # default was 4
         self.residual_multinoulli_loss_weight = 1.0
 
         self.kl_divergence_loss = 0
