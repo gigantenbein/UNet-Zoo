@@ -4,7 +4,7 @@ import numpy as np
 import torchvision
 from torchvision.utils import save_image
 import torch.nn as nn
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter, FileWriter
 
 # Python bundle packages
 import os
@@ -53,7 +53,6 @@ class UNetModel:
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer, 'min', min_lr=1e-6, verbose=True, patience=100)
 
-        self.writer = SummaryWriter()
         self.epochs = exp_config.epochs_to_train
 
         self.dice_mean = 0
@@ -76,6 +75,8 @@ class UNetModel:
 
                 self.net.forward(patch, mask, training=True)
                 self.loss = self.net.loss(mask)
+                self.reconstruction_loss = self.net.reconstruction_loss
+                self.kl_loss = self.net.kl_divergence_loss
                 assert math.isnan(self.loss) == False
 
                 self.optimizer.zero_grad()
@@ -122,6 +123,11 @@ class UNetModel:
 
             for val_step, (val_patch, val_mask, _, val_masks) in enumerate(validation_loader):
                 val_patch = val_patch.to(self.device)
+
+                #patch_arrangement = np.tile(val_patch, [self.exp_config.validation_samples, 1, 1, 1])
+               # mask_arrangement = np.tile(val_masks[:, :, np.random.choice(self.exp_config.annotator_range)],
+                #                           [self.exp_config.validation_samples, 1, 1, 1])
+
                 val_mask = val_mask.to(self.device)  # N,H,W
                 val_mask = torch.unsqueeze(val_mask, 1)  # N,1,H,W
 
@@ -158,24 +164,25 @@ class UNetModel:
     def _create_tensorboard_summary(self):
         with torch.no_grad():
 
+            self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
             # plot images of current patch for summary
             sample = torch.sigmoid(self.net.sample())
             sample = torch.chunk(sample, 2, dim=1)[0]
 
             #sample = torch.round(sample)
 
-            self.writer.add_image('Patch/GT/Sample_from_Epoch_{}'.format(self.epoch),
+            self.current_writer.add_image('Patch/GT/Sample',
                                   torch.cat([self.patch, self.mask.view(-1, 1, 128, 128),
                                              sample], dim=2), global_step=self.step, dataformats='NCHW')
             # self.writer.add_image('Deep_Supervision_from_Epoch_{}'.format(self.epoch),
             #                       forward_pass, global_step=self.step, dataformats='NCHW')
             # add current loss
-            self.writer.add_scalar('Loss_of_current_batch_from_Epoch_{}'.format(self.epoch),
-                                   self.loss, global_step=self.step)
-            self.writer.add_scalar('Dice_score_of_last_validation_from_Epoch_{}'.format(self.epoch),
-                                   self.dice_mean, global_step=self.step)
-            self.writer.add_scalar('Validation_loss_of_last_validation_from_Epoch_{}'.format(self.epoch),
-                                   self.val_loss, global_step=self.step)
+            self.current_writer.add_scalar('Total_loss', self.loss, global_step=self.step)
+            self.current_writer.add_scalar('KL_Divergence', self.kl_loss, global_step=self.step)
+            self.current_writer.add_scalar('Reconstruction_loss', self.reconstruction_loss, global_step=self.step)
+
+            self.current_writer.add_scalar('Dice_score_of_last_validation', self.dice_mean, global_step=self.step)
+            self.current_writer.add_scalar('Validation_loss_of_last_validation', self.val_loss, global_step=self.step)
 
 
 if __name__ == '__main__':
@@ -213,9 +220,8 @@ if __name__ == '__main__':
 
     model = UNetModel(exp_config)
     if args.dummy == 'dummy':
-        #create_pickle_data_with_n_samples(sys_config,1000)
         train_loader, test_loader, validation_loader = load_data_into_loader(
-            sys_config, 'size1000/', batch_size=exp_config.batch_size)
+            sys_config, 'size10/', batch_size=exp_config.batch_size)
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
     else:

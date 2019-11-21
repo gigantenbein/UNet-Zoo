@@ -20,7 +20,9 @@ exponential_weighting = True
 # use 1 for grayscale, 3 for RGB images
 input_channels = 1
 epochs_to_train = 20
-batch_size = [12, 1, 12]
+batch_size = [12, 1, 1]
+
+validation_samples = 16
 
 logging_frequency = 100
 validation_frequency = 1000

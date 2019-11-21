@@ -344,6 +344,9 @@ class PHISeg(nn.Module):
         self.exponential_weighting = exponential_weighting
         self.residual_multinoulli_loss_weight = 1.0
 
+        self.kl_divergence_loss = 0
+        self.reconstruction_loss = 0
+
         self.posterior = Posterior(input_channels, num_classes, num_filters, initializers=None, padding=True)
         self.likelihood = Likelihood(input_channels, num_classes, num_filters, initializers=None, apply_last_layer=True, padding=True)
         self.prior = Posterior(input_channels, num_classes, num_filters, initializers=None, padding=True, is_posterior=False)
@@ -481,14 +484,14 @@ class PHISeg(nn.Module):
 
         z_posterior = self.posterior_latent_space
 
-        kl_divergence = self.kl_divergence()
+        self.kl_divergence_loss = self.kl_divergence()
 
         # Here we use the posterior sample sampled above
         self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior, use_softmax=False)
 
-        reconstruction_loss = self.residual_multinoulli_loss(reconstruction=layer_reconstruction, target=segm)
+        self.reconstruction_loss = self.residual_multinoulli_loss(reconstruction=layer_reconstruction, target=segm)
 
-        return reconstruction_loss + self.kl_divergence_loss_weight * kl_divergence
+        return self.reconstruction_loss + self.kl_divergence_loss_weight * self.kl_divergence_loss
 
     def loss(self, segm):
         return self.elbo(segm)
