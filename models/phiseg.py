@@ -474,24 +474,21 @@ class PHISeg(nn.Module):
         loss = self.calculate_hierarchical_KL_div_loss()
         return loss
 
-    def elbo(self, segm, beta=10.0, reconstruct_posterior_mean=False):
+    def elbo(self, segm, reconstruct_posterior_mean=False):
         """
         Calculate the evidence lower bound of the log-likelihood of P(Y|X)
         """
 
-        z_posterior = self.sample_posterior()
+        z_posterior = self.posterior_latent_space
 
-        self.kl = self.kl_divergence()
+        kl_divergence = self.kl_divergence()
 
         # Here we use the posterior sample sampled above
         self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior, use_softmax=False)
 
         reconstruction_loss = self.residual_multinoulli_loss(reconstruction=layer_reconstruction, target=segm)
 
-        self.reconstruction_loss = torch.sum(reconstruction_loss)
-        self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
-
-        return self.reconstruction_loss + self.beta * self.kl
+        return reconstruction_loss + self.kl_divergence_loss_weight * kl_divergence
 
     def loss(self, segm):
         return self.elbo(segm)

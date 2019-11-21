@@ -27,6 +27,10 @@ from test_model import test_segmentation
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
+# TODO: check phiseg loss function, i.e. torch.mean for the reconstruction loss
+# TODO: run PHiSeg without BN and different weigths for BN
+# TODO: create returning of a sample arrangement and adapt the GED and NCC functions
+
 class UNetModel:
     '''Wrapper class for different Unet models to facilitate training, validation, logging etc.
         Args:
