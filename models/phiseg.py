@@ -449,15 +449,31 @@ class PHISeg(nn.Module):
 
         return loss_tot
 
+    def multinoulli_loss(self, reconstruction, target):
+        criterion = torch.nn.CrossEntropyLoss(reduction='none')
+
+        batch_size = reconstruction.shape[0]
+
+        recon_flat = reconstruction.view(batch_size, self.num_classes, -1)
+        target_flat = target.view(batch_size, -1).long()
+        return torch.mean(
+            torch.sum(criterion(target=target_flat, input=recon_flat), axis=1)
+        )
+
+
     def residual_multinoulli_loss(self, reconstruction, target):
 
         self.s_accumulated = [None] * self.latent_levels
         loss_tot = 0
+
         #target = target.view(-1, 128, 128).long()
         #criterion = torch.nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction='sum')
 
         # TODO: equivalent to tf.reduce_mean(tf.reduce_sum(CE_with_logits(), axis=1)
         criterion = torch.nn.BCEWithLogitsLoss(reduction='mean')
+
+        criterion = self.multinoulli_loss
+
         for ii, s_ii in zip(reversed(range(self.latent_levels)),
                             reversed(reconstruction)):
 

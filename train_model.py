@@ -177,7 +177,7 @@ class UNetModel:
                                              sample], dim=2), global_step=self.step, dataformats='NCHW')
 
             self.current_writer.add_scalar('Total_loss', self.loss, global_step=self.step)
-            self.current_writer.add_scalar('KL_Divergence', self.kl_loss, global_step=self.step)
+            self.current_writer.add_scalar('KL_Divergence_loss', self.kl_loss, global_step=self.step)
             self.current_writer.add_scalar('Reconstruction_loss', self.reconstruction_loss, global_step=self.step)
 
             self.current_writer.add_scalar('Dice_score_of_last_validation', self.dice_mean, global_step=self.step)
