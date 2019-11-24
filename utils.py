@@ -61,7 +61,6 @@ def generalised_energy_distance(sample_arr, gt_arr, nlabels=1, **kwargs):
     def dist_fct(m1, m2):
 
         label_range = kwargs.get('label_range', range(nlabels))
-        label_range = range(1, 5)
 
         per_label_iou = []
         for lbl in label_range:
@@ -164,7 +163,10 @@ def show_tensor(tensor):
     """Show images with matplotlib for debugging, only for 128,128"""
     with torch.no_grad():
         import matplotlib.pyplot as plt
-        tensor = tensor.detach()
+        try:
+            tensor = tensor.detach()
+        except:
+            pass
 
         height = tensor.shape[2]
         width = tensor.shape[3]
@@ -177,6 +179,22 @@ def show_tensor(tensor):
 
         plt.imshow(result, cmap='Greys_r')
 
+def convert_to_onehot(lblmap, nlabels):
+
+    output = np.zeros((lblmap.shape[0], lblmap.shape[1], nlabels))
+    for ii in range(nlabels):
+        output[:,:,ii] = (lblmap == ii).long()
+    return output
+
+def convert_batch_to_onehot(lblbatch, nlabels):
+
+    out = []
+    for ii in range(lblbatch.shape[0]):
+
+        lbl = convert_to_onehot(lblbatch[ii,...], nlabels)
+        out.append(lbl)
+
+    return np.asarray(out)
 
 def makefolder(folder):
     '''
