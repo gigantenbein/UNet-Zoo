@@ -74,7 +74,7 @@ def generalised_energy_distance(sample_arr, gt_arr, nlabels=1, **kwargs):
             elif torch.sum(m1_bin) > 0 and torch.sum(m2_bin) == 0 or torch.sum(m1_bin) == 0 and torch.sum(m2_bin) > 0:
                 per_label_iou.append(0)
             else:
-                per_label_iou.append(jc(m1_bin.numpy(), m2_bin.numpy()))
+                per_label_iou.append(jc(m1_bin.detach().cpu().numpy(), m2_bin.detach().cpu().numpy()))
 
         # print(1-(sum(per_label_iou) / nlabels))
 
