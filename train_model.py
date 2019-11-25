@@ -97,10 +97,9 @@ class UNetModel:
                     self._create_tensorboard_summary()
                 if self.step % exp_config.validation_frequency == 0:
                     pass
-
-                self.validate(validation_loader)
                 self.scheduler.step(self.loss)
 
+            self.validate(validation_loader)
             self._create_tensorboard_summary(end_of_epoch=True)
             self.tot_loss = 0
             self.kl_loss = 0
@@ -134,24 +133,24 @@ class UNetModel:
             for val_step, (val_patch, val_mask, _, val_masks) in enumerate(validation_loader):
                 val_patch = val_patch.to(self.device)
 
-               # # patch_arrangement = np.tile(val_patch, [self.exp_config.validation_samples, 1, 1, 1])
-               # # mask_arrangement = np.tile(val_masks[:, np.random.choice(4), :],
-               #                             [self.exp_config.validation_samples, 1, 1, 1])
-               #
-               #  patch_arrangement = torch.tensor(patch_arrangement)
-               #  mask_arrangement = torch.tensor(mask_arrangement)
-               #
-               #  self.net.forward(patch_arrangement, mask_arrangement, training=True) # sample N times
-               #  self.val_loss = self.net.loss(mask_arrangement)
-               #
-               #  s_prediction_softmax = torch.softmax(self.net.sample(testing=True), dim=1)
-               #  s_prediction_softmax_mean = torch.mean(s_prediction_softmax, axis=0)
-               #
-               #  s_prediction_arrangement = torch.argmax(s_prediction_softmax, dim=1)
-               #
-               #  ged = utils.generalised_energy_distance(s_prediction_arrangement, mask_arrangement,
-               #                                          nlabels=self.exp_config.n_classes - 1,
-               #                                          label_range=range(1, self.exp_config.n_classes))
+                patch_arrangement = val_patch.repeat((self.exp_config.validation_samples, 1, 1, 1))
+                mask_arrangement = np.tile(val_masks[:, torch.randint(4), :],
+                                           (self.exp_config.validation_samples, 1, 1, 1))
+
+                patch_arrangement = torch.tensor(patch_arrangement)
+                mask_arrangement = torch.tensor(mask_arrangement)
+
+                self.net.forward(patch_arrangement, mask_arrangement, training=True) # sample N times
+                self.val_loss = self.net.loss(mask_arrangement)
+
+                s_prediction_softmax = torch.softmax(self.net.sample(testing=True), dim=1)
+                s_prediction_softmax_mean = torch.mean(s_prediction_softmax, axis=0)
+
+                s_prediction_arrangement = torch.argmax(s_prediction_softmax, dim=1)
+
+                ged = utils.generalised_energy_distance(s_prediction_arrangement, mask_arrangement,
+                                                        nlabels=self.exp_config.n_classes - 1,
+                                                        label_range=range(1, self.exp_config.n_classes))
 
                 # mask_arrangement_one_hot = utils.convert_to_onehot(mask_arrangement, nlabels=self.exp_config.n_classes)
                 # ncc = utils.variance_ncc_dist(s_prediction_softmax, mask_arrangement_one_hot)
