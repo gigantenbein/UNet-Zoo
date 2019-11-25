@@ -75,10 +75,11 @@ class UNetModel:
         for self.epoch in range(self.epochs):
             self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
 
+            self.validate(validation_loader)
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
-                mask = torch.unsqueeze(mask, 1)  # N,1,H,W
+                mask = torch.unsqueeze(mask, 1)  # N,1,H,W:x
                 masks = masks.to(self.device)
 
                 self.mask = mask
@@ -140,6 +141,8 @@ class UNetModel:
 
             for val_step, (val_patch, val_mask, _, val_masks) in enumerate(validation_loader):
                 val_patch = val_patch.to(self.device)
+                val_mask = val_mask.to(self.device)
+                val_masks = val_masks.to(self.device)
 
                 patch_arrangement = val_patch.repeat((self.exp_config.validation_samples, 1, 1, 1))
 
