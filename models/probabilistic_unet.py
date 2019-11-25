@@ -277,12 +277,25 @@ class ProbabilisticUnet(nn.Module):
             kl_div = log_posterior_prob - log_prior_prob
         return kl_div
 
+    def multinoulli_loss(self, reconstruction, target):
+        criterion = torch.nn.CrossEntropyLoss(reduction='none')
+
+        batch_size = reconstruction.shape[0]
+
+        recon_flat = reconstruction.view(batch_size, self.num_classes, -1)
+        target_flat = target.view(batch_size, -1).long()
+        return torch.mean(
+            torch.sum(criterion(target=target_flat, input=recon_flat), axis=1)
+        )
+
+
     def elbo(self, segm, analytic_kl=True, reconstruct_posterior_mean=False):
         """
         Calculate the evidence lower bound of the log-likelihood of P(Y|X)
         """
 
-        criterion = nn.BCEWithLogitsLoss(reduction='none')
+        criterion = self.multinoulli_loss
+
         z_posterior = self.posterior_latent_space.rsample()
 
         self.kl_divergence_loss = torch.mean(
@@ -292,7 +305,7 @@ class ProbabilisticUnet(nn.Module):
         self.reconstruction = self.reconstruct(use_posterior_mean=reconstruct_posterior_mean, calculate_posterior=False,
                                                z_posterior=z_posterior)
 
-        reconstruction_loss = criterion(input=self.reconstruction, target=segm)
+        reconstruction_loss = criterion(reconstruction=self.reconstruction, target=segm)
         self.reconstruction_loss = torch.sum(reconstruction_loss)
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
 

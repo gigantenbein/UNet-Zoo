@@ -27,7 +27,6 @@ from test_model import test_segmentation
 from utils import show_tensor
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
-# TODO: check phiseg loss function, i.e. torch.mean for the reconstruction loss
 # TODO: run PHiSeg without BN and different weigths for BN
 # TODO: create returning of a sample arrangement and adapt the GED and NCC functions
 
@@ -160,8 +159,10 @@ class UNetModel:
                                                         nlabels=self.exp_config.n_classes - 1,
                                                         label_range=range(1, self.exp_config.n_classes))
 
-                mask_arrangement_one_hot = utils.convert_to_onehot(mask_arrangement, nlabels=self.exp_config.n_classes)
-                ncc = utils.variance_ncc_dist(s_prediction_softmax, mask_arrangement_one_hot)
+                #mask_arrangement_one_hot = utils.convert_to_onehot(mask_arrangement, nlabels=self.exp_config.n_classes)
+                #ncc = utils.variance_ncc_dist(s_prediction_softmax, mask_arrangement_one_hot)
+
+                ncc = 1.0
 
                 s_ = torch.argmax(s_prediction_softmax_mean, dim=0) # HW
                 s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1]) #HW
@@ -223,11 +224,12 @@ class UNetModel:
             else:
                 # plot images of current patch for summary
                 sample = torch.softmax(self.net.sample(), dim=1)
-                sample = torch.chunk(sample, 2, dim=1)[1]
+                #sample = torch.sigmoid(self.net.sample())
+                sample = torch.chunk(sample, 2, dim=1)[self.exp_config.n_classes-1]
                 # sample = torch.round(sample)
 
                 self.current_writer.add_image('Patch/GT/Sample',
-                                              torch.cat([self.patch, self.mask.view(-1, 1, 128, 128), sample], dim=3),
+                                              torch.cat([self.patch, self.mask.view(-1, 1, 128, 128), sample], dim=2),
                                               global_step=self.epoch, dataformats='NCHW')
 
 
