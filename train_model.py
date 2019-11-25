@@ -75,7 +75,6 @@ class UNetModel:
         for self.epoch in range(self.epochs):
             self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
 
-            self.validate(validation_loader)
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
@@ -199,7 +198,7 @@ class UNetModel:
             self.avg_ged = torch.mean(ged_tensor)
             self.avg_ncc = torch.mean(ncc_tensor)
 
-            logging.info(' - Mean foreground dice: %.4f' % np.mean(per_structure_dice))
+            logging.info(' - Mean foreground dice: %.4f' % torch.mean(per_structure_dice))
             logging.info(' - Mean (neg.) ELBO: %.4f' % self.avg_elbo)
             logging.info(' - Mean GED: %.4f' % self.avg_ged)
             logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
@@ -210,15 +209,6 @@ class UNetModel:
 
     def _create_tensorboard_summary(self, end_of_epoch=False):
         with torch.no_grad():
-            # plot images of current patch for summary
-            sample = torch.softmax(self.net.sample(), dim=1)
-            sample = torch.chunk(sample, 2, dim=1)[1]
-
-            #sample = torch.round(sample)
-
-            self.current_writer.add_image('Patch/GT/Sample',
-                                  torch.cat([self.patch, self.mask.view(-1, 1, 128, 128),
-                                             sample], dim=2), global_step=self.epoch, dataformats='NCHW')
 
             if end_of_epoch:
                 self.current_writer.add_scalar('Total_loss', self.loss, global_step=self.epoch)
@@ -229,9 +219,16 @@ class UNetModel:
                 self.current_writer.add_scalar('GED_score_of_last_validation', self.avg_ged, global_step=self.epoch)
                 self.current_writer.add_scalar('NCC_score_of_last_validation', self.avg_ncc, global_step=self.epoch)
 
-
-                self.val_loss = self.elbo
                 self.current_writer.add_scalar('Validation_loss_of_last_validation', self.val_loss, global_step=self.epoch)
+            else:
+                # plot images of current patch for summary
+                sample = torch.softmax(self.net.sample(), dim=1)
+                sample = torch.chunk(sample, 2, dim=1)[1]
+                # sample = torch.round(sample)
+
+                self.current_writer.add_image('Patch/GT/Sample',
+                                              torch.cat([self.patch, self.mask.view(-1, 1, 128, 128), sample], dim=3),
+                                              global_step=self.epoch, dataformats='NCHW')
 
 
 if __name__ == '__main__':
