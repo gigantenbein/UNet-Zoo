@@ -127,7 +127,7 @@ def variance_ncc_dist(sample_arr, gt_arr):
     :return: 
     """
 
-    mean_seg = np.mean(sample_arr, axis=0)
+    mean_seg = torch.mean(sample_arr, dim=0)
     mean_seg = sample_arr
 
     N = sample_arr.shape[0]
@@ -181,9 +181,12 @@ def show_tensor(tensor):
 
 def convert_to_onehot(lblmap, nlabels):
 
-    output = np.zeros((lblmap.shape[0], lblmap.shape[1], nlabels))
+    output = torch.zeros((lblmap.shape[0], nlabels, lblmap.shape[2], lblmap.shape[3]))
     for ii in range(nlabels):
-        output[:,:,ii] = (lblmap == ii).long()
+        output[:, ii, :, :] = (lblmap == ii).view(-1, lblmap.shape[2], lblmap.shape[3]).long()
+
+    assert output.shape == (lblmap.shape[0], nlabels, lblmap.shape[2], lblmap.shape[3])
+
     return output
 
 def convert_batch_to_onehot(lblbatch, nlabels):

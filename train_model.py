@@ -60,6 +60,12 @@ class UNetModel:
         self.dice_mean = 0
         self.val_loss = 0
 
+        self.avg_dice = 0
+        self.avg_elbo = 0
+        self.avg_ged = -1
+        self.avg_ncc = -1
+
+        self.step = 0
         self.current_writer = SummaryWriter()
 
     def train(self, train_loader, validation_loader):
@@ -68,6 +74,7 @@ class UNetModel:
 
         for self.epoch in range(self.epochs):
             self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
+
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
@@ -127,6 +134,7 @@ class UNetModel:
             ged_list = []
             dice_list = []
             ncc_list = []
+            elbo_list = []
 
             time_ = time.time()
 
@@ -134,14 +142,12 @@ class UNetModel:
                 val_patch = val_patch.to(self.device)
 
                 patch_arrangement = val_patch.repeat((self.exp_config.validation_samples, 1, 1, 1))
-                mask_arrangement = np.tile(val_masks[:, torch.randint(4), :],
-                                           (self.exp_config.validation_samples, 1, 1, 1))
 
-                patch_arrangement = torch.tensor(patch_arrangement)
-                mask_arrangement = torch.tensor(mask_arrangement)
+                mask_arrangement = val_mask.repeat((self.exp_config.validation_samples, 1, 1, 1))
 
                 self.net.forward(patch_arrangement, mask_arrangement, training=True) # sample N times
                 self.val_loss = self.net.loss(mask_arrangement)
+                elbo = self.val_loss
 
                 s_prediction_softmax = torch.softmax(self.net.sample(testing=True), dim=1)
                 s_prediction_softmax_mean = torch.mean(s_prediction_softmax, axis=0)
@@ -152,81 +158,50 @@ class UNetModel:
                                                         nlabels=self.exp_config.n_classes - 1,
                                                         label_range=range(1, self.exp_config.n_classes))
 
-                # mask_arrangement_one_hot = utils.convert_to_onehot(mask_arrangement, nlabels=self.exp_config.n_classes)
-                # ncc = utils.variance_ncc_dist(s_prediction_softmax, mask_arrangement_one_hot)
-            #
-            #     s_ = np.argmax(s_pred_sm_mean_, axis=-1)
-            #
-            #     # Write losses to list
-            #     per_lbl_dice = []
-            #     for lbl in range(self.exp_config.nlabels):
-            #         binary_pred = (s_ == lbl) * 1
-            #         binary_gt = (s == lbl) * 1
-            #
-            #         if np.sum(binary_gt) == 0 and np.sum(binary_pred) == 0:
-            #             per_lbl_dice.append(1)
-            #         elif np.sum(binary_pred) > 0 and np.sum(binary_gt) == 0 or np.sum(binary_pred) == 0 and np.sum(
-            #                 binary_gt) > 0:
-            #             per_lbl_dice.append(0)
-            #         else:
-            #             per_lbl_dice.append(dc(binary_pred, binary_gt))
-            #
-            #     num_batches += 1
-            #
-            #     dice_list.append(per_lbl_dice)
-            #     elbo_list.append(elbo)
-            #     ged_list.append(ged)
-            #     ncc_list.append(ncc)
-            #
-            # dice_arr = np.asarray(dice_list)
-            # per_structure_dice = dice_arr.mean(axis=0)
-            #
-            # avg_dice = np.mean(dice_arr)
-            # avg_elbo = utils.list_mean(elbo_list)
-            # avg_ged = utils.list_mean(ged_list)
-            # avg_ncc = utils.list_mean(ncc_list)
-            #
-            # logging.info('FULL VALIDATION (%d images):' % N)
-            # logging.info(' - Mean foreground dice: %.4f' % np.mean(per_structure_dice))
-            # logging.info(' - Mean (neg.) ELBO: %.4f' % avg_elbo)
-            # logging.info(' - Mean GED: %.4f' % avg_ged)
-            # logging.info(' - Mean NCC: %.4f' % avg_ncc)
-            #
-            # logging.info('@ Running through validation set took: %.2f secs' % (time.time() - start_dice_val))
+                mask_arrangement_one_hot = utils.convert_to_onehot(mask_arrangement, nlabels=self.exp_config.n_classes)
+                ncc = utils.variance_ncc_dist(s_prediction_softmax, mask_arrangement_one_hot)
 
-                val_mask = val_mask.to(self.device)  # N,H,W
-                val_mask = torch.unsqueeze(val_mask, 1)  # N,1,H,W
+                s_ = torch.argmax(s_prediction_softmax_mean, dim=0) # HW
+                s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1]) #HW
+
+                # Write losses to list
+                per_lbl_dice = []
+                for lbl in range(self.exp_config.n_classes):
+                    binary_pred = (s_ == lbl) * 1
+                    binary_gt = (s == lbl) * 1
+
+                    if torch.sum(binary_gt) == 0 and torch.sum(binary_pred) == 0:
+                        per_lbl_dice.append(1)
+                    elif torch.sum(binary_pred) > 0 and torch.sum(binary_gt) == 0 or torch.sum(binary_pred) == 0 and torch.sum(
+                            binary_gt) > 0:
+                        per_lbl_dice.append(0)
+                    else:
+                        per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(), binary_gt.detach().cpu().numpy()))
 
 
+                dice_list.append(per_lbl_dice)
+                elbo_list.append(elbo)
+                ged_list.append(ged)
+                ncc_list.append(ncc)
 
-                self.net.forward(val_patch, val_mask, training=True)
-                self.val_loss = self.net.loss(val_mask)
+            dice_tensor = torch.tensor(dice_list)
+            per_structure_dice = dice_tensor.mean(axis=0)
 
-                sample = torch.softmax(self.net.sample(testing=True), dim=1)
-                sample = torch.chunk(sample, 2, dim=1)[1]
+            elbo_tensor = torch.tensor(elbo_list)
+            ged_tensor = torch.tensor(ged_list)
+            ncc_tensor = torch.tensor(ncc_list)
 
-                sample_arrangement = [torch.softmax(self.net.sample(testing=True), dim=1) for i in range(4)]
+            self.avg_dice = torch.mean(dice_tensor)
+            self.avg_elbo = torch.mean(elbo_tensor)
+            self.avg_ged = torch.mean(ged_tensor)
+            self.avg_ncc = torch.mean(ncc_tensor)
 
-                # Generalized energy distance
-                #ged = utils.generalised_energy_distance(sample_arrangement, self.masks, 4, label_range=range(1, 5))
-                #ged_list.append(ged)
-
-                # Dice coefficient
-                sample = torch.round(sample + 0.4)
-                dice = dc(sample.detach().cpu().numpy(), val_mask.detach().cpu().numpy())
-                dice_list.append(dice)
-
-                # Normalised Cross correlation
-                #ncc = utils.variance_ncc_dist(sample.numpy(), val_masks.numpy())
-                #ncc_list.append(ncc)
-
-            #self.validation_dice_mean = dice_list.mean()
-            #self.validation_ged_mean = ged_list.mean()
-            #self.validation_ncc_mean = ncc_list.mean()
+            logging.info(' - Mean foreground dice: %.4f' % np.mean(per_structure_dice))
+            logging.info(' - Mean (neg.) ELBO: %.4f' % self.avg_elbo)
+            logging.info(' - Mean GED: %.4f' % self.avg_ged)
+            logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
 
             logging.info('Validation took {} seconds'.format(time.time()-time_))
-            self.dice_mean = np.asarray(dice_list).mean()
-            logging.info(self.dice_mean)
 
             self.net.train()
 
@@ -247,7 +222,12 @@ class UNetModel:
                 self.current_writer.add_scalar('KL_Divergence_loss', self.kl_loss, global_step=self.epoch)
                 self.current_writer.add_scalar('Reconstruction_loss', self.reconstruction_loss, global_step=self.epoch)
 
-                self.current_writer.add_scalar('Dice_score_of_last_validation', self.dice_mean, global_step=self.epoch)
+                self.current_writer.add_scalar('Dice_score_of_last_validation', self.avg_dice, global_step=self.epoch)
+                self.current_writer.add_scalar('GED_score_of_last_validation', self.avg_ged, global_step=self.epoch)
+                self.current_writer.add_scalar('NCC_score_of_last_validation', self.avg_ncc, global_step=self.epoch)
+
+
+                self.val_loss = self.elbo
                 self.current_writer.add_scalar('Validation_loss_of_last_validation', self.val_loss, global_step=self.epoch)
 
 
