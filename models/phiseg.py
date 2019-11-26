@@ -282,7 +282,7 @@ class Posterior(nn.Module):
     def forward(self, patch, segm=None):
         if segm is not None:
             segm_one_hot = utils.convert_batch_to_onehot(segm, nlabels=2)
-            patch = torch.cat((patch, segm_one_hot-0.5), dim=1)
+            patch = torch.cat((patch, torch.add(segm_one_hot, -0.5)), dim=1)
 
         blocks = []
         z = [None] * (len(self.num_filters) - 1)  # contains all hidden z
