@@ -281,7 +281,9 @@ class Posterior(nn.Module):
 
     def forward(self, patch, segm=None):
         if segm is not None:
-            segm_one_hot = utils.convert_batch_to_onehot(segm, nlabels=2)
+
+            segm_one_hot = utils.convert_batch_to_onehot(segm, nlabels=2)\
+                .to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
             patch = torch.cat((patch, torch.add(segm_one_hot, -0.5)), dim=1)
 
         blocks = []
