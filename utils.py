@@ -110,7 +110,6 @@ def generalised_energy_distance(sample_arr, gt_arr, nlabels=1, **kwargs):
 
     return (2./(N*M))*sum(d_sy) - (1./N**2)*sum(d_ss) - (1./M**2)*sum(d_yy)
 
-import matplotlib.pyplot as plt
 def variance_ncc_dist(sample_arr, gt_arr):
 
     def pixel_wise_xent(m_samp, m_gt, eps=1e-8):
