@@ -82,6 +82,7 @@ class UNetModel:
             self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
             self.validation_writer = SummaryWriter(comment='_epoch{}_validation'.format(self.epoch))
 
+            self.validate(validation_loader)
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
@@ -222,7 +223,7 @@ class UNetModel:
             ncc_tensor = torch.tensor(ncc_list)
 
             self.avg_dice = torch.mean(dice_tensor)
-            self.foreground_dice = dice_tensor[1]
+            self.foreground_dice = torch.mean(dice_tensor, dim=0)[1]
             self.val_elbo = torch.mean(elbo_tensor)
             self.val_recon_loss = torch.mean(recon_tensor)
             self.val_kl_loss = torch.mean(kl_tensor)
