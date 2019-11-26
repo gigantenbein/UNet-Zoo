@@ -74,6 +74,7 @@ class UNetModel:
         for self.epoch in range(self.epochs):
             self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
 
+            self.validate(validation_loader)
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
@@ -155,14 +156,13 @@ class UNetModel:
 
                 s_prediction_arrangement = torch.argmax(s_prediction_softmax, dim=1)
 
-                ged = utils.generalised_energy_distance(s_prediction_arrangement, mask_arrangement,
+                ground_truth_arrangement = val_masks.transpose(0, 1)  # annotations, n_labels, H, W
+                ged = utils.generalised_energy_distance(s_prediction_arrangement, ground_truth_arrangement,
                                                         nlabels=self.exp_config.n_classes - 1,
                                                         label_range=range(1, self.exp_config.n_classes))
 
-                #mask_arrangement_one_hot = utils.convert_to_onehot(mask_arrangement, nlabels=self.exp_config.n_classes)
-                #ncc = utils.variance_ncc_dist(s_prediction_softmax, mask_arrangement_one_hot)
-
-                ncc = 1.0
+                ground_truth_arrangement_one_hot = utils.convert_to_onehot(ground_truth_arrangement, nlabels=self.exp_config.n_classes)
+                ncc = utils.variance_ncc_dist(s_prediction_softmax, ground_truth_arrangement_one_hot)
 
                 s_ = torch.argmax(s_prediction_softmax_mean, dim=0) # HW
                 s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1]) #HW
@@ -174,10 +174,10 @@ class UNetModel:
                     binary_gt = (s == lbl) * 1
 
                     if torch.sum(binary_gt) == 0 and torch.sum(binary_pred) == 0:
-                        per_lbl_dice.append(1)
+                        per_lbl_dice.append(1.0)
                     elif torch.sum(binary_pred) > 0 and torch.sum(binary_gt) == 0 or torch.sum(binary_pred) == 0 and torch.sum(
                             binary_gt) > 0:
-                        per_lbl_dice.append(0)
+                        per_lbl_dice.append(0.0)
                     else:
                         per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(), binary_gt.detach().cpu().numpy()))
 
@@ -188,7 +188,7 @@ class UNetModel:
                 ncc_list.append(ncc)
 
             dice_tensor = torch.tensor(dice_list)
-            per_structure_dice = dice_tensor.mean(axis=0)
+            per_structure_dice = dice_tensor.mean(dim=0)
 
             elbo_tensor = torch.tensor(elbo_list)
             ged_tensor = torch.tensor(ged_list)

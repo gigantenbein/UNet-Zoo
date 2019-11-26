@@ -45,13 +45,13 @@ def ncc(a,v, zero_norm=True):
 
     if zero_norm:
 
-        a = (a - torch.mean(a)) / (torch.std(a) * len(a))
-        v = (v - torch.mean(v)) / torch.std(v)
+        a = (a - np.mean(a)) / (np.std(a) * len(a))
+        v = (v - np.mean(v)) / np.std(v)
 
     else:
 
-        a = (a) / (torch.std(a) * len(a))
-        v = (v) / torch.std(v)
+        a = (a) / (np.std(a) * len(a))
+        v = (v) / np.std(v)
 
     return np.correlate(a, v)
 
@@ -110,25 +110,25 @@ def generalised_energy_distance(sample_arr, gt_arr, nlabels=1, **kwargs):
 
     return (2./(N*M))*sum(d_sy) - (1./N**2)*sum(d_ss) - (1./M**2)*sum(d_yy)
 
-
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 def variance_ncc_dist(sample_arr, gt_arr):
 
     def pixel_wise_xent(m_samp, m_gt, eps=1e-8):
 
 
-        log_samples = torch.log(m_samp + eps)
+        log_samples = np.log(m_samp + eps)
 
-        return -1.0*torch.sum(m_gt*log_samples, axis=-1)
+        return -1.0*np.sum(m_gt*log_samples, axis=1)
 
     """
     :param sample_arr: expected shape N x X x Y 
     :param gt_arr: M x X x Y
     :return: 
     """
+    sample_arr = sample_arr.detach().cpu().numpy()
+    gt_arr = gt_arr.detach().cpu().numpy()
 
-    mean_seg = torch.mean(sample_arr, dim=0)
-    mean_seg = sample_arr
+    mean_seg = np.mean(sample_arr, axis=0)
 
     N = sample_arr.shape[0]
     M = gt_arr.shape[0]
@@ -136,20 +136,21 @@ def variance_ncc_dist(sample_arr, gt_arr):
     sX = sample_arr.shape[1]
     sY = sample_arr.shape[2]
 
-    E_ss_arr = torch.zeros((N,sX,sY))
-    # for i in range(N):
+    E_ss_arr = np.zeros((N,sX,sY))
+    for i in range(N):
+        E_ss_arr[i,...] = pixel_wise_xent(sample_arr[i,...], mean_seg)
         # print('pixel wise xent')
         # plt.imshow( E_ss_arr[i,...])
         # plt.show()
 
-    E_ss = torch.mean(E_ss_arr, axis=0)
+    E_ss = np.mean(E_ss_arr, axis=0)
 
-    E_sy_arr = torch.zeros((M,N, sX, sY))
+    E_sy_arr = np.zeros((M,N, sX, sY))
     for j in range(M):
         for i in range(N):
             E_sy_arr[j,i, ...] = pixel_wise_xent(sample_arr[i,...], gt_arr[j,...])
 
-    E_sy = torch.mean(E_sy_arr, axis=1)
+    E_sy = np.mean(E_sy_arr, axis=1)
 
     ncc_list = []
     for j in range(M):

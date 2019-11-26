@@ -309,7 +309,7 @@ class ProbabilisticUnet(nn.Module):
         self.reconstruction_loss = torch.sum(reconstruction_loss)
         self.mean_reconstruction_loss = torch.mean(reconstruction_loss)
 
-        return -(self.reconstruction_loss + self.beta * self.kl_divergence_loss)
+        return -(self.reconstruction_loss + 1.0 * self.kl_divergence_loss)
 
     def loss(self, mask):
         elbo = self.elbo(mask)
