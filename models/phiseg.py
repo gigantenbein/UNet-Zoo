@@ -245,7 +245,7 @@ class Posterior(nn.Module):
 
         if is_posterior:
             # increase input channel by one to accomodate place for mask
-            self.input_channels += 1
+            self.input_channels += 2
 
         self.contracting_path = nn.ModuleList()
 

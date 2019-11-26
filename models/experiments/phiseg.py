@@ -24,7 +24,7 @@ batch_size = [12, 1, 1]
 
 validation_samples = 16
 
-logging_frequency = 100
+logging_frequency = 10
 validation_frequency = 1000
 
 # model

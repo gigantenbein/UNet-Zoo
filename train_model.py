@@ -48,9 +48,9 @@ class UNetModel:
         self.exp_config = exp_config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-4, weight_decay=0)
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3, weight_decay=0)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, 'min', min_lr=1e-6, verbose=True, patience=100)
+            self.optimizer, 'min', min_lr=1e-3, verbose=True, patience=100)
 
         self.epochs = exp_config.epochs_to_train
         self.loss_list = []
@@ -62,6 +62,7 @@ class UNetModel:
         self.reconstruction_loss_list = []
         self.dice_mean = 0
         self.val_loss = 0
+        self.foreground_dice = 0
 
         self.val_recon_loss = 0
         self.val_elbo = 0
@@ -221,6 +222,7 @@ class UNetModel:
             ncc_tensor = torch.tensor(ncc_list)
 
             self.avg_dice = torch.mean(dice_tensor)
+            self.foreground_dice = dice_tensor[1]
             self.val_elbo = torch.mean(elbo_tensor)
             self.val_recon_loss = torch.mean(recon_tensor)
             self.val_kl_loss = torch.mean(kl_tensor)
@@ -228,7 +230,7 @@ class UNetModel:
             self.avg_ged = torch.mean(ged_tensor)
             self.avg_ncc = torch.mean(ncc_tensor)
 
-            logging.info(' - Mean foreground dice: %.4f' % torch.mean(per_structure_dice))
+            logging.info(' - Mean dice: %.4f' % torch.mean(per_structure_dice))
             logging.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
             logging.info(' - Mean GED: %.4f' % self.avg_ged)
             logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
@@ -246,7 +248,7 @@ class UNetModel:
                 self.current_writer.add_scalar('KL_Divergence_loss', self.kl_loss, global_step=self.epoch)
                 self.current_writer.add_scalar('Reconstruction_loss', self.reconstruction_loss, global_step=self.epoch)
 
-                self.validation_writer.add_scalar('Dice_score_of_last_validation', self.avg_dice, global_step=self.epoch)
+                self.validation_writer.add_scalar('Dice_score_of_last_validation', self.foreground_dice, global_step=self.epoch)
                 self.validation_writer.add_scalar('GED_score_of_last_validation', self.avg_ged, global_step=self.epoch)
                 self.validation_writer.add_scalar('NCC_score_of_last_validation', self.avg_ncc, global_step=self.epoch)
 

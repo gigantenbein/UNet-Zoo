@@ -198,7 +198,7 @@ def convert_batch_to_onehot(lblbatch, nlabels):
         out.append(lbl)
 
     result = torch.cat(out, dim=0)
-    return torch.tensor(result)
+    return result
 
 def makefolder(folder):
     '''
