@@ -22,11 +22,11 @@ class Conv2D(nn.Module):
         layers = []
         layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=kernel_size, padding=padding, stride=stride))
         if norm_before_activation:
-            layers.append(norm(num_features=output_dim, eps=1e-3))
+            layers.append(norm(num_features=output_dim, eps=1e-3, momentum=0.01))
             layers.append(activation())
         else:
             layers.append(activation())
-            layers.append(norm(num_features=output_dim, eps=1e-3))
+            layers.append(norm(num_features=output_dim, eps=1e-3, momentum=0.01))
 
         self.convolution = nn.Sequential(*layers)
 
