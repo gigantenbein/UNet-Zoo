@@ -194,10 +194,11 @@ def convert_batch_to_onehot(lblbatch, nlabels):
     out = []
     for ii in range(lblbatch.shape[0]):
 
-        lbl = convert_to_onehot(lblbatch[ii,...], nlabels)
+        lbl = convert_to_onehot(lblbatch[ii,...].view(1, -1, 128, 128), nlabels) # TODO: check change
         out.append(lbl)
 
-    return np.asarray(out)
+    result = torch.cat(out, dim=0)
+    return torch.tensor(result)
 
 def makefolder(folder):
     '''

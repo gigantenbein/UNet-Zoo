@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import utils
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
@@ -280,7 +281,8 @@ class Posterior(nn.Module):
 
     def forward(self, patch, segm=None):
         if segm is not None:
-            patch = torch.cat((patch, segm), dim=1)
+            segm_one_hot = utils.convert_batch_to_onehot(segm, nlabels=2)
+            patch = torch.cat((patch, segm_one_hot-0.5), dim=1)
 
         blocks = []
         z = [None] * (len(self.num_filters) - 1)  # contains all hidden z
