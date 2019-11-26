@@ -53,14 +53,20 @@ class UNetModel:
             self.optimizer, 'min', min_lr=1e-6, verbose=True, patience=100)
 
         self.epochs = exp_config.epochs_to_train
+        self.loss_list = []
+        self.mean_loss_of_epoch = 0
         self.tot_loss = 0
         self.kl_loss = 0
+        self.kl_loss_list = []
         self.reconstruction_loss = 0
+        self.reconstruction_loss_list = []
         self.dice_mean = 0
         self.val_loss = 0
 
+        self.val_recon_loss = 0
+        self.val_elbo = 0
+        self.val_kl_loss = 0
         self.avg_dice = 0
-        self.avg_elbo = 0
         self.avg_ged = -1
         self.avg_ncc = -1
 
@@ -73,8 +79,8 @@ class UNetModel:
 
         for self.epoch in range(self.epochs):
             self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
+            self.validation_writer = SummaryWriter(comment='_epoch{}_validation'.format(self.epoch))
 
-            self.validate(validation_loader)
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
@@ -89,8 +95,10 @@ class UNetModel:
                 self.loss = self.net.loss(mask)
 
                 self.tot_loss += self.loss
-                self.reconstruction_loss += self.net.reconstruction_loss
-                self.kl_loss = self.net.kl_divergence_loss
+                self.loss_list.append(self.loss)
+
+                self.reconstruction_loss_list.append(self.net.reconstruction_loss)
+                self.kl_loss_list.append(self.net.kl_divergence_loss)
                 assert math.isnan(self.loss) == False
 
                 self.optimizer.zero_grad()
@@ -106,12 +114,20 @@ class UNetModel:
                     pass
                 self.scheduler.step(self.loss)
 
+            self.mean_loss_of_epoch = sum(self.loss_list)/len(self.loss_list)
+
+            self.kl_loss = sum(self.kl_loss_list)/len(self.kl_loss_list)
+            self.reconstruction_loss = sum(self.reconstruction_loss_list)/len(self.reconstruction_loss_list)
             self.validate(validation_loader)
             self._create_tensorboard_summary(end_of_epoch=True)
             self.tot_loss = 0
             self.kl_loss = 0
             self.reconstruction_loss = 0
             self.val_loss = 0
+            self.loss_list = []
+            self.reconstruction_loss_list = []
+            self.kl_loss_list = []
+
             logging.info('Finished epoch {}'.format(self.epoch))
             print('Finished epoch {}'.format(self.epoch))
         logging.info('Finished training.')
@@ -135,6 +151,8 @@ class UNetModel:
             dice_list = []
             ncc_list = []
             elbo_list = []
+            kl_list = []
+            recon_list = []
 
             time_ = time.time()
 
@@ -150,6 +168,8 @@ class UNetModel:
                 self.net.forward(patch_arrangement, mask_arrangement, training=True) # sample N times
                 self.val_loss = self.net.loss(mask_arrangement)
                 elbo = self.val_loss
+                kl = self.net.kl_divergence_loss
+                recon = self.net.reconstruction_loss
 
                 s_prediction_softmax = torch.softmax(self.net.sample(testing=True), dim=1)
                 s_prediction_softmax_mean = torch.mean(s_prediction_softmax, axis=0)
@@ -184,6 +204,9 @@ class UNetModel:
 
                 dice_list.append(per_lbl_dice)
                 elbo_list.append(elbo)
+                kl_list.append(kl)
+                recon_list.append(recon)
+
                 ged_list.append(ged)
                 ncc_list.append(ncc)
 
@@ -191,16 +214,22 @@ class UNetModel:
             per_structure_dice = dice_tensor.mean(dim=0)
 
             elbo_tensor = torch.tensor(elbo_list)
+            kl_tensor = torch.tensor(kl_list)
+            recon_tensor = torch.tensor(recon_list)
+
             ged_tensor = torch.tensor(ged_list)
             ncc_tensor = torch.tensor(ncc_list)
 
             self.avg_dice = torch.mean(dice_tensor)
-            self.avg_elbo = torch.mean(elbo_tensor)
+            self.val_elbo = torch.mean(elbo_tensor)
+            self.val_recon_loss = torch.mean(recon_tensor)
+            self.val_kl_loss = torch.mean(kl_tensor)
+
             self.avg_ged = torch.mean(ged_tensor)
             self.avg_ncc = torch.mean(ncc_tensor)
 
             logging.info(' - Mean foreground dice: %.4f' % torch.mean(per_structure_dice))
-            logging.info(' - Mean (neg.) ELBO: %.4f' % self.avg_elbo)
+            logging.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
             logging.info(' - Mean GED: %.4f' % self.avg_ged)
             logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
 
@@ -212,15 +241,18 @@ class UNetModel:
         with torch.no_grad():
 
             if end_of_epoch:
-                self.current_writer.add_scalar('Total_loss', self.loss, global_step=self.epoch)
+                self.current_writer.add_scalar('Mean_loss', self.mean_loss_of_epoch, global_step=self.epoch)
+                self.current_writer.add_scalar('Total_loss', self.tot_loss, global_step=self.epoch)
                 self.current_writer.add_scalar('KL_Divergence_loss', self.kl_loss, global_step=self.epoch)
                 self.current_writer.add_scalar('Reconstruction_loss', self.reconstruction_loss, global_step=self.epoch)
 
-                self.current_writer.add_scalar('Dice_score_of_last_validation', self.avg_dice, global_step=self.epoch)
-                self.current_writer.add_scalar('GED_score_of_last_validation', self.avg_ged, global_step=self.epoch)
-                self.current_writer.add_scalar('NCC_score_of_last_validation', self.avg_ncc, global_step=self.epoch)
+                self.validation_writer.add_scalar('Dice_score_of_last_validation', self.avg_dice, global_step=self.epoch)
+                self.validation_writer.add_scalar('GED_score_of_last_validation', self.avg_ged, global_step=self.epoch)
+                self.validation_writer.add_scalar('NCC_score_of_last_validation', self.avg_ncc, global_step=self.epoch)
 
-                self.current_writer.add_scalar('Validation_loss_of_last_validation', self.val_loss, global_step=self.epoch)
+                self.validation_writer.add_scalar('Mean_loss', self.val_elbo, global_step=self.epoch)
+                self.validation_writer.add_scalar('KL_Divergence_loss', self.val_kl_loss, global_step=self.epoch)
+                self.validation_writer.add_scalar('Reconstruction_loss', self.val_recon_loss, global_step=self.epoch)
             else:
                 # plot images of current patch for summary
                 sample = torch.softmax(self.net.sample(), dim=1)
