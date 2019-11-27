@@ -20,6 +20,7 @@ import math
 from load_LIDC_data import load_data_into_loader, create_pickle_data_with_n_samples
 import utils
 from test_model import test_segmentation
+from torchvision.transforms import Normalize
 
 # catch all the warnings with the debugger
 # import warnings
@@ -303,14 +304,17 @@ if __name__ == '__main__':
     logging.info('**************************************************************')
 
     model = UNetModel(exp_config)
+
+    transform = exp_config.input_normalisation
+
     if args.dummy == 'dummy':
         train_loader, test_loader, validation_loader = load_data_into_loader(
-            sys_config, 'size1000/', batch_size=exp_config.batch_size)
+            sys_config, 'size1000/', batch_size=exp_config.batch_size, transform=transform)
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
     else:
         train_loader, test_loader, validation_loader = load_data_into_loader(
-            sys_config, '', batch_size=exp_config.batch_size)
+            sys_config, '', batch_size=exp_config.batch_size, transform=transform)
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
         model.save_model()

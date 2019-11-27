@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from models.phiseg import PHISeg
-
+from utils import normalise_image
 experiment_name = 'PHISeg'
 log_dir_name = 'lidc'
 
@@ -21,6 +21,8 @@ exponential_weighting = True
 input_channels = 1
 epochs_to_train = 20
 batch_size = [12, 1, 1]
+
+input_normalisation = normalise_image
 
 validation_samples = 16
 

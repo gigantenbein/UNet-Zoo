@@ -9,9 +9,10 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-def load_data_into_loader(sys_config, name, batch_size):
+def load_data_into_loader(sys_config, name, batch_size, transform=None):
     location = os.path.join(sys_config.data_root, name)
-    dataset = LIDC_IDRI(dataset_location=location)
+    dataset = LIDC_IDRI(dataset_location=location, transform=transform)
+
 
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -93,8 +94,8 @@ class LIDC_IDRI(Dataset):
         #Randomly select one of the four labels for this image
         label = self.labels[index][random.randint(0,3)].astype(float)
         labels_ = self.labels[index]
-        if self.transform is not None:
-            image = self.transform(image)
+        #if self.transform is not None:
+         #   image = self.transform(image)
 
         series_uid = self.series_uid[index]
 
@@ -107,6 +108,12 @@ class LIDC_IDRI(Dataset):
         image = image.type(torch.FloatTensor)
         label = label.type(torch.FloatTensor)
         labels_ = labels_.type(torch.FloatTensor)
+
+        # Normalise inputs
+        if self.transform:
+            image = self.transform(image)
+            label = self.transform(label)
+            labels = [self.transform(lbl) for lbl in labels_]
 
         return image, label, series_uid, labels_
 

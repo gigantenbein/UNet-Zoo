@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from models.probabilistic_unet import ProbabilisticUnet
+from utils import normalise_image
 
 experiment_name = 'ProbabilisticUnet'
 log_dir_name = 'lidc'
@@ -24,6 +25,8 @@ validation_samples = 16
 
 logging_frequency = 10
 validation_frequency = 100
+
+input_normalisation = normalise_image
 
 # model
 model = ProbabilisticUnet

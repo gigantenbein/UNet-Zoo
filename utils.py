@@ -38,6 +38,18 @@ def l2_regularisation(m):
             l2_reg = l2_reg + W.norm(2)
     return l2_reg
 
+
+def normalise_image(image):
+    '''
+    make image zero mean and unit standard deviation
+    '''
+
+    img_o = image.float()
+    m = torch.mean(img_o)
+    s = torch.std(img_o)
+    return torch.div((img_o - m), s)
+
+
 def ncc(a,v, zero_norm=True):
 
     a = a.flatten()
