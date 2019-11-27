@@ -81,13 +81,10 @@ class UNetModel:
         self.validation_writer = SummaryWriter(comment='_validation')
 
         for self.epoch in range(self.epochs):
-
-
-            self.validate(validation_loader)
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
-                mask = torch.unsqueeze(mask, 1)  # N,1,H,W:x
+                mask = torch.unsqueeze(mask, 1)  # N,1,H,W
                 masks = masks.to(self.device)
 
                 self.mask = mask
@@ -102,11 +99,13 @@ class UNetModel:
 
                 self.reconstruction_loss_list.append(self.net.reconstruction_loss)
                 self.kl_loss_list.append(self.net.kl_divergence_loss)
+
                 assert math.isnan(self.loss) == False
 
                 self.optimizer.zero_grad()
                 self.loss.backward()
                 self.optimizer.step()
+
                 if self.step % exp_config.logging_frequency == 0:
                     logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                     logging.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
@@ -123,6 +122,7 @@ class UNetModel:
             self.reconstruction_loss = sum(self.reconstruction_loss_list)/len(self.reconstruction_loss_list)
             self.validate(validation_loader)
             self._create_tensorboard_summary(end_of_epoch=True)
+
             self.tot_loss = 0
             self.kl_loss = 0
             self.reconstruction_loss = 0
