@@ -77,10 +77,11 @@ class UNetModel:
     def train(self, train_loader, validation_loader):
         self.net.train()
         logging.info('Starting training.')
+        self.current_writer = SummaryWriter()
+        self.validation_writer = SummaryWriter(comment='_validation')
 
         for self.epoch in range(self.epochs):
-            self.current_writer = SummaryWriter(comment='_epoch{}'.format(self.epoch))
-            self.validation_writer = SummaryWriter(comment='_epoch{}_validation'.format(self.epoch))
+
 
             self.validate(validation_loader)
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
