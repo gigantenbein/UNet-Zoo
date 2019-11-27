@@ -108,7 +108,7 @@ class UpConvolutionalBlock(nn.Module):
 
         assert x.shape[3] == bridge.shape[3]
         assert x.shape[2] == bridge.shape[2]
-        out = torch.cat([x, bridge], 1)
+        out = torch.cat([x, bridge], dim=1)
 
         return out
 
@@ -140,6 +140,91 @@ class SampleZBlock(nn.Module):
         z = mu + sigma * torch.randn_like(sigma, dtype=torch.float32)
 
         return mu, sigma, z
+
+
+class Posterior(nn.Module):
+    """
+    Posterior network of the PHiSeg Module
+    For each latent level a sample of the distribution of the latent level is returned
+
+    Parameters
+    ----------
+    input_channels : Number of input channels, 1 for greyscale,
+    is_posterior: if True, the mask is concatenated to the input of the encoder, causing it to be a ConditionalVAE
+    """
+    def __init__(self, input_channels, num_classes, num_filters, initializers=None, padding=True, is_posterior=True):
+        super(Posterior, self).__init__()
+        self.input_channels = input_channels
+        self.num_filters = num_filters
+
+        self.latent_levels = (len(self.num_filters) - 1)
+
+        self.padding = padding
+        self.activation_maps = []
+
+        if is_posterior:
+            # increase input channel by two to accomodate place for mask in one hot encoding
+            self.input_channels += 2
+
+        self.contracting_path = nn.ModuleList()
+
+        for i in range(len(self.num_filters)):
+            input = self.input_channels if i == 0 else output
+            output = self.num_filters[i]
+
+            pool = False if i == 0 else True
+
+            self.contracting_path.append(DownConvolutionalBlock(input,
+                                                                output,
+                                                                initializers,
+                                                                depth=3,
+                                                                padding=padding,
+                                                                pool=pool)
+                                         )
+
+        self.upsampling_path = nn.ModuleList()
+
+        for i in range(self.latent_levels - 1, 0, -1):
+            input = 2
+            output = self.num_filters[0]*2
+            self.upsampling_path.append(UpConvolutionalBlock(input, output, initializers, padding))
+
+        self.sample_z_path = nn.ModuleList()
+        for i in range(self.latent_levels, 0, -1):
+            input = 2*self.num_filters[0] + self.num_filters[i]
+            if i == self.latent_levels:
+                input = self.num_filters[i]
+                self.sample_z_path.append(SampleZBlock(input, depth=2))
+            else:
+                self.sample_z_path.append(SampleZBlock(input, depth=2))
+
+    def forward(self, patch, segm=None):
+        if segm is not None:
+
+            segm_one_hot = utils.convert_batch_to_onehot(segm, nlabels=2)\
+                .to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+            patch = torch.cat((patch, torch.add(segm_one_hot, -0.5)), dim=1)
+
+        blocks = []
+        z = [None] * (len(self.num_filters) - 1)  # contains all hidden z
+        sigma = [None] * (len(self.num_filters) - 1)
+        mu = [None] * (len(self.num_filters) - 1)
+
+        x = patch
+        for i, down in enumerate(self.contracting_path):
+            x = down(x)
+            if i != len(self.contracting_path) - 1:
+                blocks.append(x)
+
+        pre_conv = x
+        for i, sample_z in enumerate(self.sample_z_path):
+            if i != 0:
+                pre_conv = self.upsampling_path[i-1](z[-i], blocks[-i])
+            mu[-i-1], sigma[-i-1], z[-i-1] = self.sample_z_path[i](pre_conv)
+
+        del blocks
+
+        return z, mu, sigma
 
 
 class Likelihood(nn.Module):
@@ -221,91 +306,6 @@ class Likelihood(nn.Module):
             s[-i-1] = torch.nn.functional.interpolate(s_in, size=[128, 128], mode='nearest')
 
         return s
-
-
-class Posterior(nn.Module):
-    """
-    Posterior network of the PHiSeg Module
-    For each latent level a sample of the distribution of the latent level is returned
-
-    Parameters
-    ----------
-    input_channels : Number of input channels, 1 for greyscale,
-    is_posterior: if True, the mask is concatenated to the input of the encoder, causing it to be a ConditionalVAE
-    """
-    def __init__(self, input_channels, num_classes, num_filters, initializers=None, padding=True, is_posterior=True):
-        super(Posterior, self).__init__()
-        self.input_channels = input_channels
-        self.num_filters = num_filters
-
-        self.latent_levels = (len(self.num_filters) - 1)
-
-        self.padding = padding
-        self.activation_maps = []
-
-        if is_posterior:
-            # increase input channel by one to accomodate place for mask
-            self.input_channels += 2
-
-        self.contracting_path = nn.ModuleList()
-
-        for i in range(len(self.num_filters)):
-            input = self.input_channels if i == 0 else output
-            output = self.num_filters[i]
-
-            pool = False if i == 0 else True
-
-            self.contracting_path.append(DownConvolutionalBlock(input,
-                                                                output,
-                                                                initializers,
-                                                                depth=3,
-                                                                padding=padding,
-                                                                pool=pool)
-                                         )
-
-        self.upsampling_path = nn.ModuleList()
-
-        for i in range(self.latent_levels - 1, 0, -1):
-            input = 2
-            output = self.num_filters[0]*2
-            self.upsampling_path.append(UpConvolutionalBlock(input, output, initializers, padding))
-
-        self.sample_z_path = nn.ModuleList()
-        for i in range(self.latent_levels, 0, -1):
-            input = 2*self.num_filters[0] + self.num_filters[i]
-            if i == self.latent_levels:
-                input = self.num_filters[i]
-                self.sample_z_path.append(SampleZBlock(input, depth=0))
-            else:
-                self.sample_z_path.append(SampleZBlock(input, depth=2))
-
-    def forward(self, patch, segm=None):
-        if segm is not None:
-
-            segm_one_hot = utils.convert_batch_to_onehot(segm, nlabels=2)\
-                .to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-            patch = torch.cat((patch, torch.add(segm_one_hot, -0.5)), dim=1)
-
-        blocks = []
-        z = [None] * (len(self.num_filters) - 1)  # contains all hidden z
-        sigma = [None] * (len(self.num_filters) - 1)
-        mu = [None] * (len(self.num_filters) - 1)
-
-        x = patch
-        for i, down in enumerate(self.contracting_path):
-            x = down(x)
-            if i != len(self.contracting_path) - 1:
-                blocks.append(x)
-
-        pre_conv = x
-        for i, sample_z in enumerate(self.sample_z_path):
-            if i != 0:
-                pre_conv = self.upsampling_path[i-1](z[-i], blocks[-i])
-            mu[-i-1], sigma[-i-1], z[-i-1] = self.sample_z_path[i](pre_conv)
-
-        del blocks
-
-        return z, mu, sigma
 
 
 class PHISeg(nn.Module):
