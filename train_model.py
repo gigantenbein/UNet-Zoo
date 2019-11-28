@@ -29,13 +29,11 @@ from torchvision.transforms import Normalize
 from utils import show_tensor
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
-# TODO: run PHiSeg without BN and different weigths for BN
-# TODO: create returning of a sample arrangement and adapt the GED and NCC functions
 
 class UNetModel:
     '''Wrapper class for different Unet models to facilitate training, validation, logging etc.
         Args:
-            exp_config: Experiment configuration file
+            exp_config: Experiment configuration file as given in the experiment folder
     '''
     def __init__(self, exp_config):
 
@@ -84,13 +82,10 @@ class UNetModel:
         training_set_size = len(data.train.indices)//exp_config.batch_size
 
         for self.epoch in range(self.epochs):
-            #self.validate_(data)
             for i in range(training_set_size):
                 x_b, s_b = data.train.next_batch(exp_config.batch_size)
 
-                # what an ugly line: bring patch to tensor and transpose from NHWC to NCHW
                 patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
-                patch = patch.transpose(1, 3).transpose(2, 3)
 
                 mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
                 mask = torch.unsqueeze(mask, 1)
@@ -208,16 +203,6 @@ class UNetModel:
             print('Finished epoch {}'.format(self.epoch))
         logging.info('Finished training.')
 
-    def save_model(self):
-        model_name = self.exp_config.experiment_name + '.pth'
-        save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
-        torch.save(self.net.state_dict(), save_model_path)
-        logging.info('saved model to .pth file in {}'.format(save_model_path))
-
-    def test(self):
-        # test_quantitative(model_path, exp_config, sys_config)
-        test_segmentation(exp_config, sys_config, 10)
-
     def validate_(self, data):
         with torch.no_grad():
             self.net.eval()
@@ -328,7 +313,6 @@ class UNetModel:
             logging.info('Validation took {} seconds'.format(time.time()-time_))
 
             self.net.train()
-
 
     def validate(self, validation_loader):
         with torch.no_grad():
@@ -453,6 +437,11 @@ class UNetModel:
                                               torch.cat([self.patch, self.mask.view(-1, 1, 128, 128), sample], dim=2),
                                               global_step=self.epoch, dataformats='NCHW')
 
+    def save_model(self):
+        model_name = self.exp_config.experiment_name + '.pth'
+        save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
+        torch.save(self.net.state_dict(), save_model_path)
+        logging.info('saved model to .pth file in {}'.format(save_model_path))
 
 if __name__ == '__main__':
 
@@ -488,12 +477,10 @@ if __name__ == '__main__':
     logging.info('**************************************************************')
 
     model = UNetModel(exp_config)
-
-    transform = exp_config.input_normalisation
     transform = None
 
     data = lidc_data(sys_config=sys_config, exp_config=exp_config)
-    #model.train_(data)
+    model.train_(data)
 
     if args.dummy == 'dummy':
         train_loader, test_loader, validation_loader = load_data_into_loader(
@@ -506,6 +493,6 @@ if __name__ == '__main__':
         # utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         # model.train(train_loader, validation_loader)
         # model.save_model()
-        model.train(data)
+        model.train_(data)
 
     model.save_model()

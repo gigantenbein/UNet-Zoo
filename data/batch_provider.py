@@ -124,7 +124,7 @@ class BatchProvider():
             X_batch = utils.map_images_to_intensity_range(np.float32(X_batch), self.rescale_range[0], self.rescale_range[1], percentiles=0.0)
 
         if self.add_dummy_dimension:
-            X_batch = np.expand_dims(X_batch, axis=-1)
+            X_batch = np.expand_dims(X_batch, axis=1)
 
         return X_batch, y_batch
 
