@@ -108,7 +108,6 @@ class UNetModel:
                 self.loss.backward()
                 self.optimizer.step()
 
-                print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                 if self.step % exp_config.logging_frequency == 0:
                     logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                     logging.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))

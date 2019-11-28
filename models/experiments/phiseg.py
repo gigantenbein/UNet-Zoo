@@ -36,7 +36,7 @@ input_normalisation = normalise_image
 
 validation_samples = 16
 
-logging_frequency = 10
+logging_frequency = 1000
 validation_frequency = 1000
 
 # model
