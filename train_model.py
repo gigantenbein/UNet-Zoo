@@ -108,7 +108,6 @@ class UNetModel:
                 self.loss.backward()
                 self.optimizer.step()
 
-
                 print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                 if self.step % exp_config.logging_frequency == 0:
                     logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
@@ -125,7 +124,7 @@ class UNetModel:
             self.kl_loss = sum(self.kl_loss_list) / len(self.kl_loss_list)
             self.reconstruction_loss = sum(self.reconstruction_loss_list) / len(self.reconstruction_loss_list)
             self._create_tensorboard_summary()
-            self.validate(validation_loader)
+            self.validate_(data)
             self._create_tensorboard_summary(end_of_epoch=True)
 
             self.tot_loss = 0
