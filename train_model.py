@@ -82,7 +82,7 @@ class UNetModel:
         training_set_size = len(data.train.indices)//exp_config.batch_size
 
         for self.epoch in range(1, self.epochs):
-            for self.step in range(training_set_size):
+            for self.step in range(1, training_set_size):
                 x_b, s_b = data.train.next_batch(exp_config.batch_size)
 
                 patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
@@ -107,6 +107,7 @@ class UNetModel:
                 self.optimizer.zero_grad()
                 self.loss.backward()
                 self.optimizer.step()
+
 
                 print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                 if self.step % exp_config.logging_frequency == 0:
@@ -429,11 +430,12 @@ class UNetModel:
                 # plot images of current patch for summary
                 sample = torch.softmax(self.net.sample(), dim=1)
                 #sample = torch.sigmoid(self.net.sample())
-                sample = torch.chunk(sample, 2, dim=1)[self.exp_config.n_classes-1]
+                sample1 = torch.chunk(sample, 2, dim=1)[self.exp_config.n_classes-1]
+                sample2 = torch.chunk(sample, 2, dim=1)[self.exp_config.n_classes - 2]
                 # sample = torch.round(sample)
 
                 self.current_writer.add_image('Patch/GT/Sample',
-                                              torch.cat([self.patch, self.mask.view(-1, 1, 128, 128), sample], dim=2),
+                                              torch.cat([self.patch, self.mask.view(-1, 1, 128, 128), sample1, sample2], dim=2),
                                               global_step=self.epoch, dataformats='NCHW')
 
     def save_model(self):
