@@ -7,6 +7,63 @@ from medpy.metric import jc
 import numpy as np
 import os
 
+try:
+    import cv2
+except:
+    logging.warning('Could not import opencv. Augmentation functions will be unavailable.')
+else:
+    def rotate_image(img, angle, interp=cv2.INTER_LINEAR):
+
+        rows, cols = img.shape[:2]
+        rotation_matrix = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
+        return cv2.warpAffine(img, rotation_matrix, (cols, rows), flags=interp)
+
+    def rotate_image_as_onehot(img, angle, nlabels, interp=cv2.INTER_LINEAR):
+
+        onehot_output = rotate_image(convert_to_onehot(img, nlabels=nlabels), angle, interp)
+        return np.argmax(onehot_output, axis=-1)
+
+    def resize_image(im, size, interp=cv2.INTER_LINEAR):
+
+        im_resized = cv2.resize(im, (size[1], size[0]), interpolation=interp)  # swap sizes to account for weird OCV API
+        return im_resized
+
+    def resize_image_as_onehot(im, size, nlabels, interp=cv2.INTER_LINEAR):
+
+        onehot_output = resize_image(convert_to_onehot(im, nlabels), size, interp=interp)
+        return np.argmax(onehot_output, axis=-1)
+
+
+    def deformation_to_transformation(dx, dy):
+
+        nx, ny = dx.shape
+
+        # grid_x, grid_y = np.meshgrid(np.arange(nx), np.arange(ny))
+        grid_y, grid_x = np.meshgrid(np.arange(nx), np.arange(ny), indexing="ij")  # Robin's change to make it work with non-square images
+
+        map_x = (grid_x + dx).astype(np.float32)
+        map_y = (grid_y + dy).astype(np.float32)
+
+        return map_x, map_y
+
+    def dense_image_warp(im, dx, dy, interp=cv2.INTER_LINEAR, do_optimisation=True):
+
+        map_x, map_y = deformation_to_transformation(dx, dy)
+
+        # The following command converts the maps to compact fixed point representation
+        # this leads to a ~20% increase in speed but could lead to accuracy losses
+        # Can be uncommented
+        if do_optimisation:
+            map_x, map_y = cv2.convertMaps(map_x, map_y, dstmap1type=cv2.CV_16SC2)
+        return cv2.remap(im, map_x, map_y, interpolation=interp, borderMode=cv2.BORDER_REFLECT) #borderValue=float(np.min(im)))
+
+
+    def dense_image_warp_as_onehot(im, dx, dy, nlabels, interp=cv2.INTER_LINEAR, do_optimisation=True):
+
+        onehot_output = dense_image_warp(convert_to_onehot(im, nlabels), dx, dy, interp, do_optimisation=do_optimisation)
+        return np.argmax(onehot_output, axis=-1)
+
+
 def truncated_normal_(tensor, mean=0, std=1):
     size = tensor.shape
     tmp = tensor.new_empty(size + (4,)).normal_()
@@ -15,6 +72,7 @@ def truncated_normal_(tensor, mean=0, std=1):
     tensor.data.copy_(tmp.gather(-1, ind).squeeze(-1))
     tensor.data.mul_(std).add_(mean)
 
+
 def init_weights(m):
     if type(m) == nn.Conv2d or type(m) == nn.ConvTranspose2d:
         nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
@@ -22,11 +80,13 @@ def init_weights(m):
         #nn.init.normal_(m.bias, std=0.001)
         truncated_normal_(m.bias, mean=0, std=0.001)
 
+
 def init_weights_orthogonal_normal(m):
     if type(m) == nn.Conv2d or type(m) == nn.ConvTranspose2d:
         nn.init.orthogonal_(m.weight)
         truncated_normal_(m.bias, mean=0, std=0.001)
         #nn.init.normal_(m.bias, std=0.001)
+
 
 def l2_regularisation(m):
     l2_reg = None
@@ -44,10 +104,25 @@ def normalise_image(image):
     make image zero mean and unit standard deviation
     '''
 
-    img_o = image.float()
-    m = torch.mean(img_o)
-    s = torch.std(img_o)
-    return torch.div((img_o - m), s)
+    img_o = np.float32(image.copy())
+    m = np.mean(img_o)
+    s = np.std(img_o)
+    return np.divide((img_o - m), s)
+
+
+def normalise_images(X):
+    '''
+    Helper for making the images zero mean and unit standard deviation i.e. `white`
+    '''
+
+    X_white = np.zeros(X.shape, dtype=np.float32)
+
+    for ii in range(X.shape[0]):
+
+        Xc = X[ii,...]
+        X_white[ii,...] = normalise_image(Xc)
+
+    return X_white.astype(np.float32)
 
 
 def ncc(a,v, zero_norm=True):
@@ -191,26 +266,42 @@ def show_tensor(tensor):
 
         plt.imshow(result, cmap='Greys_r')
 
+# def convert_to_onehot(lblmap, nlabels):
+#
+#     output = torch.zeros((lblmap.shape[0], nlabels, lblmap.shape[2], lblmap.shape[3]))
+#     for ii in range(nlabels):
+#         output[:, ii, :, :] = (lblmap == ii).view(-1, lblmap.shape[2], lblmap.shape[3]).long()
+#
+#     assert output.shape == (lblmap.shape[0], nlabels, lblmap.shape[2], lblmap.shape[3])
+#
+#     return output
 def convert_to_onehot(lblmap, nlabels):
 
-    output = torch.zeros((lblmap.shape[0], nlabels, lblmap.shape[2], lblmap.shape[3]))
+    output = np.zeros((lblmap.shape[0], lblmap.shape[1], nlabels))
     for ii in range(nlabels):
-        output[:, ii, :, :] = (lblmap == ii).view(-1, lblmap.shape[2], lblmap.shape[3]).long()
-
-    assert output.shape == (lblmap.shape[0], nlabels, lblmap.shape[2], lblmap.shape[3])
-
+        output[:, :, ii] = (lblmap == ii).astype(np.uint8)
     return output
 
-def convert_batch_to_onehot(lblbatch, nlabels):
 
+# needs a torch tensor as input instead of numpy array
+# accepts format HW and CHW
+def convert_to_onehot_torch(lblmap, nlabels):
+    output = torch.zeros((nlabels, lblmap.shape[-2], lblmap.shape[-1]))
+    for ii in range(nlabels):
+        lbl = (lblmap == ii).view(lblmap.shape[-2], lblmap.shape[-1])
+        output[ii, :, :] = lbl
+    return output.long()
+
+
+def convert_batch_to_onehot(lblbatch, nlabels):
     out = []
     for ii in range(lblbatch.shape[0]):
-
-        lbl = convert_to_onehot(lblbatch[ii,...].view(1, -1, 128, 128), nlabels) # TODO: check change
-        out.append(lbl)
+        lbl = convert_to_onehot_torch(lblbatch[ii,...], nlabels) # TODO: check change
+        out.append(lbl.unsqueeze(dim=0))
 
     result = torch.cat(out, dim=0)
     return result
+
 
 def makefolder(folder):
     '''
@@ -222,3 +313,15 @@ def makefolder(folder):
         os.makedirs(folder)
         return True
     return False
+
+
+def convert_nhwc_to_nchw(tensor):
+    result = tensor.transpose(1, 3).transpose(2, 3)
+    return result
+
+
+def convert_nchw_to_nhwc(tensor):
+    result = tensor.transpose(1, 3).transpose(1, 2)
+    assert torch.equal(tensor, convert_nhwc_to_nchw(result))
+    return result
+

@@ -9,3 +9,6 @@ log_root = '/scratch_net/airfox/ganmarc/log'
 
 data_root = '/scratch_net/airfox/ganmarc/data/'
 dummy_data_root = None
+
+data_root = '/scratch_net/airfox/ganmarc/data/data_lidc.pickle'
+preproc_folder = '/scratch_net/airfox/ganmarc/data/preproc'

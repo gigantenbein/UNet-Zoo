@@ -17,6 +17,7 @@ from medpy.metric import dc
 import math
 
 # own files
+from data.lidc_data import lidc_data
 from load_LIDC_data import load_data_into_loader, create_pickle_data_with_n_samples
 import utils
 from test_model import test_segmentation
@@ -72,16 +73,84 @@ class UNetModel:
         self.avg_ged = -1
         self.avg_ncc = -1
 
-        self.step = 0
         self.current_writer = SummaryWriter()
+        self.validation_writer = SummaryWriter(comment='_validation')
+        self.step = 0
+
+    def train_(self, data):
+        self.net.train()
+        logging.info('Starting training.')
+
+        training_set_size = len(data.train.indices)//exp_config.batch_size
+
+        for self.epoch in range(self.epochs):
+            #self.validate_(data)
+            for i in range(training_set_size):
+                x_b, s_b = data.train.next_batch(exp_config.batch_size)
+
+                # what an ugly line: bring patch to tensor and transpose from NHWC to NCHW
+                patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
+                patch = patch.transpose(1, 3).transpose(2, 3)
+
+                mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
+                mask = torch.unsqueeze(mask, 1)
+
+                self.mask = mask
+                self.patch = patch
+
+                self.net.forward(patch, mask, training=True)
+                self.loss = self.net.loss(mask)
+
+                self.tot_loss += self.loss
+                self.loss_list.append(self.loss)
+
+                self.reconstruction_loss_list.append(self.net.reconstruction_loss)
+                self.kl_loss_list.append(self.net.kl_divergence_loss)
+
+                assert math.isnan(self.loss) == False
+
+                self.optimizer.zero_grad()
+                self.loss.backward()
+                self.optimizer.step()
+
+                print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                if self.step % exp_config.logging_frequency == 0:
+                    logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                    logging.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
+                    print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                    print('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
+                    self._create_tensorboard_summary()
+                if self.step % exp_config.validation_frequency == 0:
+                    self._create_tensorboard_summary()
+                    self.validate_(data)
+                self.scheduler.step(self.loss)
+
+            self.mean_loss_of_epoch = sum(self.loss_list) / len(self.loss_list)
+
+            self.kl_loss = sum(self.kl_loss_list) / len(self.kl_loss_list)
+            self.reconstruction_loss = sum(self.reconstruction_loss_list) / len(self.reconstruction_loss_list)
+            self._create_tensorboard_summary()
+            self.validate(validation_loader)
+            self._create_tensorboard_summary(end_of_epoch=True)
+
+            self.tot_loss = 0
+            self.kl_loss = 0
+            self.reconstruction_loss = 0
+            self.val_loss = 0
+            self.loss_list = []
+            self.reconstruction_loss_list = []
+            self.kl_loss_list = []
+
+            logging.info('Finished epoch {}'.format(self.epoch))
+            print('Finished epoch {}'.format(self.epoch))
+        logging.info('Finished training.')
 
     def train(self, train_loader, validation_loader):
         self.net.train()
         logging.info('Starting training.')
-        self.current_writer = SummaryWriter()
-        self.validation_writer = SummaryWriter(comment='_validation')
 
         for self.epoch in range(self.epochs):
+            self.validate(validation_loader)
             for self.step, (patch, mask, _, masks) in enumerate(train_loader):
                 patch = patch.to(self.device)
                 mask = mask.to(self.device)  # N,H,W
@@ -107,6 +176,7 @@ class UNetModel:
                 self.loss.backward()
                 self.optimizer.step()
 
+                print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                 if self.step % exp_config.logging_frequency == 0:
                     logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                     logging.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
@@ -114,13 +184,15 @@ class UNetModel:
                     print('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
                     self._create_tensorboard_summary()
                 if self.step % exp_config.validation_frequency == 0:
-                    pass
+                    self._create_tensorboard_summary()
+                    self.validate(validation_loader)
                 self.scheduler.step(self.loss)
 
             self.mean_loss_of_epoch = sum(self.loss_list)/len(self.loss_list)
 
             self.kl_loss = sum(self.kl_loss_list)/len(self.kl_loss_list)
             self.reconstruction_loss = sum(self.reconstruction_loss_list)/len(self.reconstruction_loss_list)
+            self._create_tensorboard_summary()
             self.validate(validation_loader)
             self._create_tensorboard_summary(end_of_epoch=True)
 
@@ -145,6 +217,118 @@ class UNetModel:
     def test(self):
         # test_quantitative(model_path, exp_config, sys_config)
         test_segmentation(exp_config, sys_config, 10)
+
+    def validate_(self, data):
+        with torch.no_grad():
+            self.net.eval()
+            logging.info('Validation for step {}'.format(self.step))
+
+            ged_list = []
+            dice_list = []
+            ncc_list = []
+            elbo_list = []
+            kl_list = []
+            recon_list = []
+
+            time_ = time.time()
+
+            validation_set_size = data.validation.images.shape[0]
+
+            for ii in range(validation_set_size):
+
+                s_gt_arr = data.validation.labels[ii, ...]
+
+
+                # from HW to NCHW
+                x_b = data.validation.images[ii, ...]
+                patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
+                val_patch = patch.unsqueeze(dim=0).unsqueeze(dim=1)
+
+                s_b = s_gt_arr[:, :, np.random.choice(self.exp_config.annotator_range)]
+                mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
+                val_mask = mask.unsqueeze(dim=0).unsqueeze(dim=1)
+                val_masks = torch.tensor(s_gt_arr, dtype=torch.float32).to(self.device)  # HWC
+                val_masks = val_masks.transpose(0, 2).transpose(1, 2)  # CHW
+                val_masks = val_masks.unsqueeze(dim=0)  # 1, annotations, H, W
+
+                patch_arrangement = val_patch.repeat((self.exp_config.validation_samples, 1, 1, 1))
+
+                mask_arrangement = val_mask.repeat((self.exp_config.validation_samples, 1, 1, 1))
+
+                # training=True for constructing posterior as well
+                self.net.forward(patch_arrangement, mask_arrangement, training=True) # sample N times
+                self.val_loss = self.net.loss(mask_arrangement)
+                elbo = self.val_loss
+                kl = self.net.kl_divergence_loss
+                recon = self.net.reconstruction_loss
+
+                s_prediction_softmax = torch.softmax(self.net.sample(testing=True), dim=1)
+                s_prediction_softmax_mean = torch.mean(s_prediction_softmax, axis=0)
+
+                s_prediction_arrangement = torch.argmax(s_prediction_softmax, dim=1)
+
+                ground_truth_arrangement = val_masks.transpose(0, 1)  # annotations, n_labels, H, W
+                ged = utils.generalised_energy_distance(s_prediction_arrangement, ground_truth_arrangement,
+                                                        nlabels=self.exp_config.n_classes - 1,
+                                                        label_range=range(1, self.exp_config.n_classes))
+
+                ground_truth_arrangement_one_hot = utils.convert_batch_to_onehot(ground_truth_arrangement, nlabels=self.exp_config.n_classes)
+                ncc = utils.variance_ncc_dist(s_prediction_softmax, ground_truth_arrangement_one_hot)
+
+                s_ = torch.argmax(s_prediction_softmax_mean, dim=0) # HW
+                s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1]) #HW
+
+                # Write losses to list
+                per_lbl_dice = []
+                for lbl in range(self.exp_config.n_classes):
+                    binary_pred = (s_ == lbl) * 1
+                    binary_gt = (s == lbl) * 1
+
+                    if torch.sum(binary_gt) == 0 and torch.sum(binary_pred) == 0:
+                        per_lbl_dice.append(1.0)
+                    elif torch.sum(binary_pred) > 0 and torch.sum(binary_gt) == 0 or torch.sum(binary_pred) == 0 and torch.sum(
+                            binary_gt) > 0:
+                        per_lbl_dice.append(0.0)
+                    else:
+                        per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(), binary_gt.detach().cpu().numpy()))
+
+
+                dice_list.append(per_lbl_dice)
+                elbo_list.append(elbo)
+                kl_list.append(kl)
+                recon_list.append(recon)
+
+                ged_list.append(ged)
+                ncc_list.append(ncc)
+
+            dice_tensor = torch.tensor(dice_list)
+            per_structure_dice = dice_tensor.mean(dim=0)
+
+            elbo_tensor = torch.tensor(elbo_list)
+            kl_tensor = torch.tensor(kl_list)
+            recon_tensor = torch.tensor(recon_list)
+
+            ged_tensor = torch.tensor(ged_list)
+            ncc_tensor = torch.tensor(ncc_list)
+
+            self.avg_dice = torch.mean(dice_tensor)
+            self.foreground_dice = torch.mean(dice_tensor, dim=0)[1]
+            self.val_elbo = torch.mean(elbo_tensor)
+            self.val_recon_loss = torch.mean(recon_tensor)
+            self.val_kl_loss = torch.mean(kl_tensor)
+
+            self.avg_ged = torch.mean(ged_tensor)
+            self.avg_ncc = torch.mean(ncc_tensor)
+
+            logging.info(' - Mean dice: %.4f' % torch.mean(per_structure_dice))
+            logging.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+            logging.info(' - Mean GED: %.4f' % self.avg_ged)
+            logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
+
+            logging.info('Validation took {} seconds'.format(time.time()-time_))
+
+            self.net.train()
+
 
     def validate(self, validation_loader):
         with torch.no_grad():
@@ -306,6 +490,10 @@ if __name__ == '__main__':
     model = UNetModel(exp_config)
 
     transform = exp_config.input_normalisation
+    transform = None
+
+    data = lidc_data(sys_config=sys_config, exp_config=exp_config)
+    #model.train_(data)
 
     if args.dummy == 'dummy':
         train_loader, test_loader, validation_loader = load_data_into_loader(
@@ -313,10 +501,11 @@ if __name__ == '__main__':
         utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
         model.train(train_loader, validation_loader)
     else:
-        train_loader, test_loader, validation_loader = load_data_into_loader(
-            sys_config, '', batch_size=exp_config.batch_size, transform=transform)
-        utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
-        model.train(train_loader, validation_loader)
-        model.save_model()
+        # train_loader, test_loader, validation_loader = load_data_into_loader(
+        #     sys_config, '', batch_size=exp_config.batch_size, transform=transform)
+        # utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
+        # model.train(train_loader, validation_loader)
+        # model.save_model()
+        model.train(data)
 
     model.save_model()
