@@ -81,8 +81,8 @@ class UNetModel:
 
         training_set_size = len(data.train.indices)//exp_config.batch_size
 
-        for self.epoch in range(self.epochs):
-            for i in range(training_set_size):
+        for self.epoch in range(1, self.epochs):
+            for self.step in range(training_set_size):
                 x_b, s_b = data.train.next_batch(exp_config.batch_size)
 
                 patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
@@ -116,7 +116,6 @@ class UNetModel:
                     print('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
                     self._create_tensorboard_summary()
                 if self.step % exp_config.validation_frequency == 0:
-                    self._create_tensorboard_summary()
                     self.validate_(data)
                 self.scheduler.step(self.loss)
 
