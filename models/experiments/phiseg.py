@@ -9,7 +9,7 @@ log_dir_name = 'lidc'
 filter_channels = [32, 64, 128, 192, 192, 192, 192]
 latent_levels = len(filter_channels) - 1
 
-
+iterations = 5000000
 
 n_classes = 2
 num_labels_per_subject = 4
@@ -36,7 +36,7 @@ input_normalisation = normalise_image
 
 validation_samples = 16
 
-logging_frequency = 1000
+logging_frequency = 500
 validation_frequency = 1000
 
 # model

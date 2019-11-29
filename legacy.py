@@ -52,3 +52,80 @@ def dummy_train():
     optimizer.step()
 
     print('step')
+
+    def train(self, train_loader, validation_loader):
+        self.net.train()
+        logging.info('Starting training.')
+
+        for self.epoch in range(self.epochs):
+            self.validate(validation_loader)
+            for self.step, (patch, mask, _, masks) in enumerate(train_loader):
+                patch = patch.to(self.device)
+                mask = mask.to(self.device)  # N,H,W
+                mask = torch.unsqueeze(mask, 1)  # N,1,H,W
+                masks = masks.to(self.device)
+
+                self.mask = mask
+                self.patch = patch
+                self.masks = masks
+
+                self.net.forward(patch, mask, training=True)
+                self.loss = self.net.loss(mask)
+
+                self.tot_loss += self.loss
+                self.loss_list.append(self.loss)
+
+                self.reconstruction_loss_list.append(self.net.reconstruction_loss)
+                self.kl_loss_list.append(self.net.kl_divergence_loss)
+
+                assert math.isnan(self.loss) == False
+
+                self.optimizer.zero_grad()
+                self.loss.backward()
+                self.optimizer.step()
+
+                print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                if self.step % exp_config.logging_frequency == 0:
+                    logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                    logging.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
+                    print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                    print('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
+                    self._create_tensorboard_summary()
+                if self.step % exp_config.validation_frequency == 0:
+                    self._create_tensorboard_summary()
+                    self.validate(validation_loader)
+                self.scheduler.step(self.loss)
+
+            self.mean_loss_of_epoch = sum(self.loss_list)/len(self.loss_list)
+
+            self.kl_loss = sum(self.kl_loss_list)/len(self.kl_loss_list)
+            self.reconstruction_loss = sum(self.reconstruction_loss_list)/len(self.reconstruction_loss_list)
+            self._create_tensorboard_summary()
+            self.validate(validation_loader)
+            self._create_tensorboard_summary(end_of_epoch=True)
+
+            self.tot_loss = 0
+            self.kl_loss = 0
+            self.reconstruction_loss = 0
+            self.val_loss = 0
+            self.loss_list = []
+            self.reconstruction_loss_list = []
+            self.kl_loss_list = []
+
+            logging.info('Finished epoch {}'.format(self.epoch))
+            print('Finished epoch {}'.format(self.epoch))
+        logging.info('Finished training.')
+
+if __name__ == '__main__':
+    if args.dummy == 'dummy':
+        train_loader, test_loader, validation_loader = load_data_into_loader(
+            sys_config, 'size1000/', batch_size=exp_config.batch_size, transform=transform)
+        utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
+        model.train(train_loader, validation_loader)
+    else:
+        # train_loader, test_loader, validation_loader = load_data_into_loader(
+        #     sys_config, '', batch_size=exp_config.batch_size, transform=transform)
+        # utils.makefolder(os.path.join(sys_config.project_root, 'segmentation/', exp_config.experiment_name))
+        # model.train(train_loader, validation_loader)
+        # model.save_model()
+        model.train(data)
