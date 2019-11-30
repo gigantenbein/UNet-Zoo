@@ -81,7 +81,6 @@ class UNetModel:
         logging.info('Starting training.')
 
         for self.iteration in range(1, self.exp_config.iterations):
-            print(self.iteration)
             x_b, s_b = data.train.next_batch(exp_config.batch_size)
 
             patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
@@ -115,7 +114,6 @@ class UNetModel:
                 self.reconstruction_loss = 0
 
             self.scheduler.step(self.loss)
-            self.save_model('test_ckpt')
 
         logging.info('Finished training.')
 
@@ -254,7 +252,7 @@ class UNetModel:
     def validate(self, validation_loader):
         self.net.eval()
         with torch.no_grad():
-            logging.info('Validation for step {}'.format(self.step))
+            logging.info('Validation for step {}'.format(self.iteration))
 
             ged_list = []
             dice_list = []
