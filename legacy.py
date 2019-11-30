@@ -116,6 +116,105 @@ def dummy_train():
             print('Finished epoch {}'.format(self.epoch))
         logging.info('Finished training.')
 
+def validate(self, validation_loader):
+    self.net.eval()
+    with torch.no_grad():
+        logging.info('Validation for step {}'.format(self.iteration))
+
+        ged_list = []
+        dice_list = []
+        ncc_list = []
+        elbo_list = []
+        kl_list = []
+        recon_list = []
+
+        time_ = time.time()
+
+        for val_step, (val_patch, val_mask, _, val_masks) in enumerate(validation_loader):
+            val_patch = val_patch.to(self.device)
+            val_mask = val_mask.to(self.device)
+            val_masks = val_masks.to(self.device)
+
+            patch_arrangement = val_patch.repeat((self.exp_config.validation_samples, 1, 1, 1))
+
+            mask_arrangement = val_mask.repeat((self.exp_config.validation_samples, 1, 1, 1))
+
+            self.net.forward(patch_arrangement, mask_arrangement, training=True)  # sample N times
+            self.val_loss = self.net.loss(mask_arrangement)
+            elbo = self.val_loss
+            kl = self.net.kl_divergence_loss
+            recon = self.net.reconstruction_loss
+
+            s_prediction_softmax = torch.softmax(self.net.sample(testing=True), dim=1)
+            s_prediction_softmax_mean = torch.mean(s_prediction_softmax, axis=0)
+
+            s_prediction_arrangement = torch.argmax(s_prediction_softmax, dim=1)
+
+            ground_truth_arrangement = val_masks.transpose(0, 1)  # annotations, n_labels, H, W
+            ged = utils.generalised_energy_distance(s_prediction_arrangement, ground_truth_arrangement,
+                                                    nlabels=self.exp_config.n_classes - 1,
+                                                    label_range=range(1, self.exp_config.n_classes))
+
+            ground_truth_arrangement_one_hot = utils.convert_to_onehot(ground_truth_arrangement,
+                                                                       nlabels=self.exp_config.n_classes)
+            ncc = utils.variance_ncc_dist(s_prediction_softmax, ground_truth_arrangement_one_hot)
+
+            s_ = torch.argmax(s_prediction_softmax_mean, dim=0)  # HW
+            s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1])  # HW
+
+            # Write losses to list
+            per_lbl_dice = []
+            for lbl in range(self.exp_config.n_classes):
+                binary_pred = (s_ == lbl) * 1
+                binary_gt = (s == lbl) * 1
+
+                if torch.sum(binary_gt) == 0 and torch.sum(binary_pred) == 0:
+                    per_lbl_dice.append(1.0)
+                elif torch.sum(binary_pred) > 0 and torch.sum(binary_gt) == 0 or torch.sum(
+                        binary_pred) == 0 and torch.sum(
+                        binary_gt) > 0:
+                    per_lbl_dice.append(0.0)
+                else:
+                    per_lbl_dice.append(
+                        dc(binary_pred.detach().cpu().numpy(), binary_gt.detach().cpu().numpy()))
+
+            dice_list.append(per_lbl_dice)
+            elbo_list.append(elbo)
+            kl_list.append(kl)
+            recon_list.append(recon)
+
+            ged_list.append(ged)
+            ncc_list.append(ncc)
+
+        dice_tensor = torch.tensor(dice_list)
+        per_structure_dice = dice_tensor.mean(dim=0)
+
+        elbo_tensor = torch.tensor(elbo_list)
+        kl_tensor = torch.tensor(kl_list)
+        recon_tensor = torch.tensor(recon_list)
+
+        ged_tensor = torch.tensor(ged_list)
+        ncc_tensor = torch.tensor(ncc_list)
+
+        self.avg_dice = torch.mean(dice_tensor)
+        self.foreground_dice = torch.mean(dice_tensor, dim=0)[1]
+        self.val_elbo = torch.mean(elbo_tensor)
+        self.val_recon_loss = torch.mean(recon_tensor)
+        self.val_kl_loss = torch.mean(kl_tensor)
+
+        self.avg_ged = torch.mean(ged_tensor)
+        self.avg_ncc = torch.mean(ncc_tensor)
+
+        logging.info(' - Mean dice: %.4f' % torch.mean(per_structure_dice))
+        logging.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+        logging.info(' - Mean GED: %.4f' % self.avg_ged)
+        logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
+
+        logging.info('Validation took {} seconds'.format(time.time() - time_))
+
+    self.net.train()
+
+
 if __name__ == '__main__':
     if args.dummy == 'dummy':
         train_loader, test_loader, validation_loader = load_data_into_loader(
