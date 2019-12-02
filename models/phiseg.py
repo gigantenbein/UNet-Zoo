@@ -103,7 +103,7 @@ class UpConvolutionalBlock(nn.Module):
 
     def forward(self, x, bridge):
         if self.bilinear:
-            x = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=True)
+            x = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=False)
             x = self.upconv_layer(x)
 
         assert x.shape[3] == bridge.shape[3]
@@ -239,7 +239,7 @@ def increase_resolution(times, input_dim, output_dim):
         module_list.append(nn.Upsample(
                     mode='bilinear',
                     scale_factor=2,
-                    align_corners=True))
+                    align_corners=False))
         if i != 0:
             input_dim = output_dim
         module_list.append(Conv2DSequence(input_dim=input_dim, output_dim=output_dim, depth=1))
@@ -314,7 +314,7 @@ class Likelihood(nn.Module):
                 post_c[i+1],
                 mode='bilinear',
                 scale_factor=2,
-                align_corners=True)
+                align_corners=False)
 
             assert post_z[i].shape[3] == ups_below.shape[3]
             assert post_z[i].shape[2] == ups_below.shape[2]

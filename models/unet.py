@@ -82,7 +82,7 @@ class UpConvBlock(nn.Module):
 
     def forward(self, x, bridge):
         if self.bilinear:
-            up = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=True)
+            up = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=False)
         else:
             up = self.upconv_layer(x)
 
