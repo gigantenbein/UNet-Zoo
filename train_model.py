@@ -135,7 +135,7 @@ class UNetModel:
 
             time_ = time.time()
 
-            validation_set_size = data.validation.images.shape[0]
+            validation_set_size = data.validation.images.shape[0] if self.exp_config.num_validation_images == 'all' else self.exp_config.num_validation_images
 
             for ii in range(validation_set_size):
 
