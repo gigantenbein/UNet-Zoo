@@ -40,7 +40,7 @@ class UNetModel:
         self.net = exp_config.model(input_channels=exp_config.input_channels,
                                     num_classes=exp_config.n_classes,
                                     num_filters=exp_config.filter_channels,
-                                    latent_dim=exp_config.latent_levels,
+                                    latent_levels=exp_config.latent_levels,
                                     no_convs_fcomb=exp_config.no_convs_fcomb,
                                     beta=exp_config.beta,
                                     reversible=exp_config.use_reversible
@@ -81,7 +81,6 @@ class UNetModel:
         logging.info('Starting training.')
 
         for self.iteration in range(1, self.exp_config.iterations):
-
             x_b, s_b = data.train.next_batch(exp_config.batch_size)
 
             patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)

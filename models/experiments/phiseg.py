@@ -7,7 +7,7 @@ log_dir_name = 'lidc'
 
 # number of filter for the latent levels, they will be applied in the order as loaded into the list
 filter_channels = [32, 64, 128, 192, 192, 192, 192]
-latent_levels = len(filter_channels) - 1
+latent_levels = 5
 
 iterations = 5000000
 

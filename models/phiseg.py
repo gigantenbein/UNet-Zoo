@@ -157,7 +157,9 @@ class Posterior(nn.Module):
         self.input_channels = input_channels
         self.num_filters = num_filters
 
-        self.latent_levels = (len(self.num_filters) - 1)
+        self.latent_levels = 5
+        self.resolution_levels = 7
+        self.lvl_diff = self.resolution_levels - self.latent_levels
 
         self.padding = padding
         self.activation_maps = []
@@ -168,7 +170,7 @@ class Posterior(nn.Module):
 
         self.contracting_path = nn.ModuleList()
 
-        for i in range(len(self.num_filters)):
+        for i in range(self.resolution_levels):
             input = self.input_channels if i == 0 else output
             output = self.num_filters[i]
 
@@ -184,16 +186,16 @@ class Posterior(nn.Module):
 
         self.upsampling_path = nn.ModuleList()
 
-        for i in range(self.latent_levels - 1, 0, -1):
+        for i in reversed(range(self.latent_levels)):  # iterates from [latent_levels -1, ... ,0]
             input = 2
             output = self.num_filters[0]*2
             self.upsampling_path.append(UpConvolutionalBlock(input, output, initializers, padding))
 
         self.sample_z_path = nn.ModuleList()
-        for i in range(self.latent_levels, 0, -1):
-            input = 2*self.num_filters[0] + self.num_filters[i]
-            if i == self.latent_levels:
-                input = self.num_filters[i]
+        for i in reversed(range(self.latent_levels)):
+            input = 2*self.num_filters[0] + self.num_filters[i + self.lvl_diff]
+            if i == self.latent_levels - 1:
+                input = self.num_filters[i + self.lvl_diff]
                 self.sample_z_path.append(SampleZBlock(input, depth=2))
             else:
                 self.sample_z_path.append(SampleZBlock(input, depth=2))
@@ -209,9 +211,9 @@ class Posterior(nn.Module):
             patch = torch.cat([patch, torch.add(segm_one_hot, -0.5)], dim=1)
 
         blocks = []
-        z = [None] * (len(self.num_filters) - 1)  # contains all hidden z
-        sigma = [None] * (len(self.num_filters) - 1)
-        mu = [None] * (len(self.num_filters) - 1)
+        z = [None] * self.latent_levels # contains all hidden z
+        sigma = [None] * self.latent_levels
+        mu = [None] * self.latent_levels
 
         x = patch
         for i, down in enumerate(self.contracting_path):
@@ -230,15 +232,34 @@ class Posterior(nn.Module):
         return z, mu, sigma
 
 
+def increase_resolution(times, input_dim, output_dim):
+    """ Increase the resolution by n time for the beginning of the likelihood path"""
+    module_list = []
+    for i in range(times):
+        module_list.append(nn.Upsample(
+                    mode='bilinear',
+                    scale_factor=2,
+                    align_corners=True))
+        if i != 0:
+            input_dim = output_dim
+        module_list.append(Conv2DSequence(input_dim=input_dim, output_dim=output_dim, depth=1))
+
+    return nn.Sequential(*module_list)
+
+
 class Likelihood(nn.Module):
-    def __init__(self, input_channels, num_classes, num_filters, initializers=None, apply_last_layer=True, padding=True):
+    # TODO: add latent_level and resolution_levels to exp_config file
+    def __init__(self, input_channels, num_classes, num_filters, latent_levels=5, resolution_levels=7, initializers=None, apply_last_layer=True, padding=True):
         super(Likelihood, self).__init__()
 
         self.input_channels = input_channels
         self.num_classes = num_classes
         self.num_filters = num_filters
 
-        self.latent_levels = (len(self.num_filters) - 1)
+        self.latent_levels = latent_levels
+        self.resolution_levels = resolution_levels
+
+        self.lvl_diff = resolution_levels -latent_levels
 
         self.padding = padding
         self.activation_maps = []
@@ -248,23 +269,25 @@ class Likelihood(nn.Module):
         self.likelihood_post_ups_path = nn.ModuleList()
 
         # path for upsampling
-        for i in range(self.latent_levels, 0, -1):
+        for i in reversed(range(self.latent_levels)):
             input = self.num_filters[i]
-            output = self.num_filters[i - 1]
+            output = self.num_filters[i]
             self.likelihood_ups_path.append(Conv2DSequence(input_dim=2, output_dim=input, depth=2))
-            self.likelihood_post_ups_path.append(Conv2DSequence(input_dim=input, output_dim=output, depth=1))
+
+            self.likelihood_post_ups_path.append(increase_resolution(times=self.lvl_diff, input_dim=input, output_dim=input))
 
         # path after concatenation
         self.likelihood_post_c_path = nn.ModuleList()
-        for i in range(self.latent_levels-1, 0, -1):
-            input = self.num_filters[i] + self.num_filters[i-1]
-            output = self.num_filters[i-1]
+        for i in range(latent_levels - 1):
+            input = self.num_filters[i] + self.num_filters[i + self.lvl_diff]
+            input = self.num_filters[i] + 192 # TODO: do not hardcode this
+            output = self.num_filters[i + self.lvl_diff]
             self.likelihood_post_c_path.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2))
 
         self.s_layer = nn.ModuleList()
         output = self.num_classes
-        for i in range(self.latent_levels, 0, -1):
-            input = self.num_filters[i-1]
+        for i in reversed(range(self.latent_levels)):
+            input = self.num_filters[i + self.lvl_diff]
             self.s_layer.append(Conv2DSequence(
                 input_dim=input, output_dim=output, depth=1, kernel=1, activation=torch.nn.Identity, norm=torch.nn.Identity))
 
@@ -277,15 +300,12 @@ class Likelihood(nn.Module):
         # start from the downmost layer and the last filter
         for i in range(self.latent_levels):
             assert z[-i-1].shape[1] == 2
-            assert z[-i-1].shape[2] == 128 * 2**(-self.latent_levels + i)
+            assert z[-i-1].shape[2] == 128 * 2**(-self.resolution_levels + 1 + i)
             post_z[-i - 1] = self.likelihood_ups_path[i](z[-i - 1])
-            post_z[-i - 1] = nn.functional.interpolate(
-                post_z[-i - 1],
-                mode='bilinear',
-                scale_factor=2,
-                align_corners=True)
-            assert post_z[-i - 1].shape[2] == 128 * 2 ** (-self.latent_levels + i + 1)
+
             post_z[-i - 1] = self.likelihood_post_ups_path[i](post_z[-i - 1])
+            assert post_z[-i - 1].shape[2] == 128 * 2 ** (-self.latent_levels + i + 1)
+            assert post_z[-i-1].shape[1] == self.num_filters[-i-1 - self.lvl_diff], '{} != {}'.format(post_z[-i-1].shape[1],self.num_filters[-i-1])
 
         post_c[self.latent_levels - 1] = post_z[self.latent_levels - 1]
 
@@ -302,7 +322,7 @@ class Likelihood(nn.Module):
             # Reminder: Pytorch standard is NCHW, TF NHWC
             concat = torch.cat([post_z[i], ups_below], dim=1)
 
-            post_c[i] = self.likelihood_post_c_path[-i-1](concat)
+            post_c[i] = self.likelihood_post_c_path[i](concat)
 
         for i, block in enumerate(self.s_layer):
             s_in = block(post_c[-i-1]) # no activation in the last layer
@@ -325,7 +345,7 @@ class PHISeg(nn.Module):
                  input_channels,
                  num_classes,
                  num_filters,
-                 latent_dim=2,
+                 latent_levels=6,
                  initializers=None,
                  no_convs_fcomb=4,
                  beta=10.0,
@@ -338,7 +358,7 @@ class PHISeg(nn.Module):
         self.num_classes = num_classes
         self.num_filters = num_filters
 
-        self.latent_levels = (len(self.num_filters) - 1)
+        self.latent_levels = latent_levels
 
         self.loss_dict={}
         self.kl_divergence_loss_weight = 1.0
