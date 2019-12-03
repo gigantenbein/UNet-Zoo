@@ -204,8 +204,6 @@ class UNetModel:
                 kl_list.append(kl)
                 recon_list.append(recon)
 
-                print('GED: {}'.format(ged))
-                print('NCC: {}'.format(ncc))
                 ged_list.append(ged)
                 ncc_list.append(ncc)
 
