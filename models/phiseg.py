@@ -345,7 +345,7 @@ class PHISeg(nn.Module):
                  input_channels,
                  num_classes,
                  num_filters,
-                 latent_levels=6,
+                 latent_levels=5,
                  initializers=None,
                  no_convs_fcomb=4,
                  beta=10.0,
@@ -359,6 +359,8 @@ class PHISeg(nn.Module):
         self.num_filters = num_filters
 
         self.latent_levels = latent_levels
+
+        self.loss_tot = 0
 
         self.loss_dict={}
         self.kl_divergence_loss_weight = 1.0
@@ -455,7 +457,6 @@ class PHISeg(nn.Module):
         posterior_sigma_list = self.posterior_sigma
         posterior_mu_list = self.posterior_mu
 
-        loss_tot = 0
 
         if self.exponential_weighting:
             level_weights = [self.exponential_weight ** i for i in list(range(self.latent_levels))]
@@ -472,9 +473,9 @@ class PHISeg(nn.Module):
                 prior_mu_list[ii],
                 prior_sigma_list[ii])
 
-            loss_tot += self.kl_divergence_loss_weight * self.loss_dict['KL_divergence_loss_lvl%d' % ii]
+            self.loss_tot += self.kl_divergence_loss_weight * self.loss_dict['KL_divergence_loss_lvl%d' % ii]
 
-        return loss_tot
+        return self.loss_tot
 
     def multinoulli_loss(self, reconstruction, target):
         criterion = torch.nn.CrossEntropyLoss(reduction='none')
@@ -493,12 +494,6 @@ class PHISeg(nn.Module):
         self.s_accumulated = [None] * self.latent_levels
         loss_tot = 0
 
-        #target = target.view(-1, 128, 128).long()
-        #criterion = torch.nn.BCEWithLogitsLoss(size_average=False, reduce=False, reduction='sum')
-
-        # TODO: equivalent to tf.reduce_mean(tf.reduce_sum(CE_with_logits(), axis=1)
-        criterion = torch.nn.BCEWithLogitsLoss(reduction='mean')
-
         criterion = self.multinoulli_loss
 
         for ii, s_ii in zip(reversed(range(self.latent_levels)),
@@ -514,8 +509,8 @@ class PHISeg(nn.Module):
                 self.s_accumulated[ii] = self.s_accumulated[ii+1] + s_ii
                 self.loss_dict['residual_multinoulli_loss_lvl%d' % ii] = criterion(self.s_accumulated[ii], target)
 
-            loss_tot += self.residual_multinoulli_loss_weight * self.loss_dict['residual_multinoulli_loss_lvl%d' % ii]
-        return loss_tot
+            self.loss_tot += self.residual_multinoulli_loss_weight * self.loss_dict['residual_multinoulli_loss_lvl%d' % ii]
+        return self.loss_tot
 
     def kl_divergence(self):
         loss = self.calculate_hierarchical_KL_div_loss()
