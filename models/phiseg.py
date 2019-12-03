@@ -200,7 +200,7 @@ class Posterior(nn.Module):
             else:
                 self.sample_z_path.append(SampleZBlock(input, depth=2))
 
-    def forward(self, patch, segm=None):
+    def forward(self, patch, segm=None, training_prior=False, z_list=None):
         if segm is not None:
 
             with torch.no_grad():
@@ -226,6 +226,8 @@ class Posterior(nn.Module):
             if i != 0:
                 pre_conv = self.upsampling_path[i-1](z[-i], blocks[-i])
             mu[-i-1], sigma[-i-1], z[-i-1] = self.sample_z_path[i](pre_conv)
+            if training_prior:
+                z[-i-1] = z_list[-i-1]
 
         del blocks
 
@@ -259,7 +261,7 @@ class Likelihood(nn.Module):
         self.latent_levels = latent_levels
         self.resolution_levels = resolution_levels
 
-        self.lvl_diff = resolution_levels -latent_levels
+        self.lvl_diff = resolution_levels - latent_levels
 
         self.padding = padding
         self.activation_maps = []
@@ -415,6 +417,7 @@ class PHISeg(nn.Module):
     def forward(self, patch, mask, training=True):
         if training:
             self.posterior_latent_space, self.posterior_mu, self.posterior_sigma = self.posterior(patch, mask)
+            self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch, training_prior=True, z_list=self.posterior_latent_space)
             self.s_out_list = self.likelihood(self.posterior_latent_space)
 
         self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch)
@@ -456,7 +459,6 @@ class PHISeg(nn.Module):
         prior_mu_list = self.prior_mu
         posterior_sigma_list = self.posterior_sigma
         posterior_mu_list = self.posterior_mu
-
 
         if self.exponential_weighting:
             level_weights = [self.exponential_weight ** i for i in list(range(self.latent_levels))]
@@ -525,9 +527,9 @@ class PHISeg(nn.Module):
         self.kl_divergence_loss = self.kl_divergence()
 
         # Here we use the posterior sample sampled above
-        self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior, use_softmax=False)
+        #self.reconstruction, layer_reconstruction = self.reconstruct(z_posterior=z_posterior, use_softmax=False)
 
-        self.reconstruction_loss = self.residual_multinoulli_loss(reconstruction=layer_reconstruction, target=segm)
+        self.reconstruction_loss = self.residual_multinoulli_loss(reconstruction=self.s_out_list, target=segm)
 
         #return self.reconstruction_loss + self.kl_divergence_loss_weight * self.kl_divergence_loss
         return self.loss_tot
