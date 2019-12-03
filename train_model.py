@@ -50,7 +50,7 @@ class UNetModel:
         self.net.to(self.device)
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3, weight_decay=0)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, 'min', min_lr=1e-4, verbose=True, patience=5000)
+            self.optimizer, 'min', min_lr=1e-3, verbose=True, patience=5000)
 
         self.mean_loss_of_epoch = 0
         self.tot_loss = 0
@@ -254,7 +254,7 @@ class UNetModel:
         self.net.eval()
         with torch.no_grad():
             # calculate the means since the last validation
-            self.training_writer.add_scalar('Mean_loss', self.mean_loss_of_epoch/self.exp_config.validation_frequency, global_step=self.iteration)
+            self.training_writer.add_scalar('Mean_loss', self.tot_loss/self.exp_config.validation_frequency, global_step=self.iteration)
             self.training_writer.add_scalar('KL_Divergence_loss', self.kl_loss/self.exp_config.validation_frequency, global_step=self.iteration)
             self.training_writer.add_scalar('Reconstruction_loss', self.reconstruction_loss/self.exp_config.validation_frequency, global_step=self.iteration)
 

@@ -103,7 +103,7 @@ class UpConvolutionalBlock(nn.Module):
 
     def forward(self, x, bridge):
         if self.bilinear:
-            x = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=False)
+            x = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=True)
             x = self.upconv_layer(x)
 
         assert x.shape[3] == bridge.shape[3]
@@ -239,7 +239,7 @@ def increase_resolution(times, input_dim, output_dim):
         module_list.append(nn.Upsample(
                     mode='bilinear',
                     scale_factor=2,
-                    align_corners=False))
+                    align_corners=True))
         if i != 0:
             input_dim = output_dim
         module_list.append(Conv2DSequence(input_dim=input_dim, output_dim=output_dim, depth=1))
@@ -314,7 +314,7 @@ class Likelihood(nn.Module):
                 post_c[i+1],
                 mode='bilinear',
                 scale_factor=2,
-                align_corners=False)
+                align_corners=True)
 
             assert post_z[i].shape[3] == ups_below.shape[3]
             assert post_z[i].shape[2] == ups_below.shape[2]
@@ -488,7 +488,6 @@ class PHISeg(nn.Module):
             torch.sum(criterion(target=target_flat, input=recon_flat), axis=1)
         )
 
-
     def residual_multinoulli_loss(self, reconstruction, target):
 
         self.s_accumulated = [None] * self.latent_levels
@@ -520,7 +519,7 @@ class PHISeg(nn.Module):
         """
         Calculate the evidence lower bound of the log-likelihood of P(Y|X)
         """
-
+        self.loss_tot = 0
         z_posterior = self.posterior_latent_space
 
         self.kl_divergence_loss = self.kl_divergence()
@@ -530,7 +529,8 @@ class PHISeg(nn.Module):
 
         self.reconstruction_loss = self.residual_multinoulli_loss(reconstruction=layer_reconstruction, target=segm)
 
-        return self.reconstruction_loss + self.kl_divergence_loss_weight * self.kl_divergence_loss
+        #return self.reconstruction_loss + self.kl_divergence_loss_weight * self.kl_divergence_loss
+        return self.loss_tot
 
     def loss(self, segm):
         return self.elbo(segm)
