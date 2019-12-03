@@ -419,9 +419,9 @@ class PHISeg(nn.Module):
             self.posterior_latent_space, self.posterior_mu, self.posterior_sigma = self.posterior(patch, mask)
             self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch, training_prior=True, z_list=self.posterior_latent_space)
             self.s_out_list = self.likelihood(self.posterior_latent_space)
-
-        self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch)
-        if not training:
+        else:
+            self.posterior_latent_space, self.posterior_mu, self.posterior_sigma = self.posterior(patch, mask)
+            self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch, training_prior=False)
             self.s_out_list = self.likelihood(self.prior_latent_space)
 
         return self.s_out_list
@@ -431,7 +431,7 @@ class PHISeg(nn.Module):
         for i in range(len(output_list) - 1):
             s_accum += output_list[i]
         if use_softmax:
-            return torch.nn.functional.softmax(s_accum)
+            return torch.nn.functional.softmax(s_accum, dim=1)
         return s_accum
 
     def KL_two_gauss_with_diag_cov(self, mu0, sigma0, mu1, sigma1):

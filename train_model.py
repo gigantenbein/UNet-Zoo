@@ -151,7 +151,6 @@ class UNetModel:
                 val_mask = mask.unsqueeze(dim=0).unsqueeze(dim=1)
                 val_masks = torch.tensor(s_gt_arr, dtype=torch.float32).to(self.device)  # HWC
                 val_masks = val_masks.transpose(0, 2).transpose(1, 2)  # CHW
-                val_masks = val_masks.unsqueeze(dim=0)  # 1, annotations, H, W
 
                 patch_arrangement = val_patch.repeat((self.exp_config.validation_samples, 1, 1, 1))
 
@@ -161,24 +160,27 @@ class UNetModel:
                 self.patch = patch_arrangement
 
                 # training=True for constructing posterior as well
-                self.net.forward(patch_arrangement, mask_arrangement, training=True) # sample N times
+                s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
+                s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
+
+                # sample N times
                 self.val_loss = self.net.loss(mask_arrangement)
                 elbo = self.val_loss
                 kl = self.net.kl_divergence_loss
                 recon = self.net.reconstruction_loss
 
-                s_prediction_softmax = torch.softmax(self.net.sample(testing=True), dim=1)
-                s_prediction_softmax_mean = torch.mean(s_prediction_softmax, axis=0)
+                s_prediction_softmax_mean = torch.mean(s_prediction_softmax_arrangement, axis=0)
+                s_prediction_arrangement = torch.argmax(s_prediction_softmax_arrangement, dim=1)
 
-                s_prediction_arrangement = torch.argmax(s_prediction_softmax, dim=1)
-
-                ground_truth_arrangement = val_masks.transpose(0, 1)  # annotations, n_labels, H, W
+                ground_truth_arrangement = val_masks  # nlabels, H, W
                 ged = utils.generalised_energy_distance(s_prediction_arrangement, ground_truth_arrangement,
                                                         nlabels=self.exp_config.n_classes - 1,
                                                         label_range=range(1, self.exp_config.n_classes))
 
-                ground_truth_arrangement_one_hot = utils.convert_batch_to_onehot(ground_truth_arrangement, nlabels=self.exp_config.n_classes)
-                ncc = utils.variance_ncc_dist(s_prediction_softmax, ground_truth_arrangement_one_hot)
+                # num_gts, nlabels, H, W
+                s_gt_arr_r = val_masks.unsqueeze(dim=1)
+                ground_truth_arrangement_one_hot = utils.convert_batch_to_onehot(s_gt_arr_r, nlabels=self.exp_config.n_classes)
+                ncc = utils.variance_ncc_dist(s_prediction_softmax_arrangement, ground_truth_arrangement_one_hot)
 
                 s_ = torch.argmax(s_prediction_softmax_mean, dim=0) # HW
                 s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1]) #HW
@@ -202,6 +204,8 @@ class UNetModel:
                 kl_list.append(kl)
                 recon_list.append(recon)
 
+                print('GED: {}'.format(ged))
+                print('NCC: {}'.format(ncc))
                 ged_list.append(ged)
                 ncc_list.append(ncc)
 
