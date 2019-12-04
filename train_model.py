@@ -275,6 +275,10 @@ class UNetModel:
             self.training_writer.add_image('Patch/GT/Sample',
                                           torch.cat([self.patch, self.mask.view(-1, 1, 128, 128), sample1], dim=2),
                                           global_step=self.iteration, dataformats='NCHW')
+
+            if self.device == torch.device('cuda'):
+                self.training_writer.add_scalar('Max memory allocated', torch.cuda.max_memory_allocated(self.device), self.iteration)
+
         self.net.train()
 
     def save_model(self, savename):

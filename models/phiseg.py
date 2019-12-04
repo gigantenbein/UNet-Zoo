@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import utils
+import revtorch as rv
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
@@ -57,6 +58,26 @@ class Conv2DSequence(nn.Module):
     def forward(self, x):
         return self.convolution(x)
 
+
+class ReversibleSequence(nn.Module):
+    """This class implements a a reversible sequence made out of n convolutions with ReLU activation and BN"""
+    def __init__(self, in_size, out_size, reversible_depth=3):
+        super(ReversibleSequence, self).__init__()
+        blocks = []
+        for i in range(reversible_depth):
+
+            #f and g must both be a nn.Module whos output has the same shape as its input
+            f_func = nn.Sequential(Conv2D(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
+            g_func = nn.Sequential(Conv2D(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
+
+            #we construct a reversible block with our F and G functions
+            blocks.append(rv.ReversibleBlock(f_func, g_func))
+
+        #pack all reversible blocks into a reversible sequence
+        self.sequence = rv.ReversibleSequence(nn.ModuleList(blocks))
+
+    def forward(self, x):
+        return self.sequence(x)
 
 class DownConvolutionalBlock(nn.Module):
     def __init__(self, input_dim, output_dim, initializers, depth=3, padding=True, pool=True):
