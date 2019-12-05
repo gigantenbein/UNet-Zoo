@@ -50,7 +50,7 @@ class UNetModel:
         self.net.to(self.device)
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3, weight_decay=0)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, 'min', min_lr=1e-3, verbose=True, patience=5000)
+            self.optimizer, 'min', min_lr=1e-4, verbose=True, patience=5000)
 
         self.mean_loss_of_epoch = 0
         self.tot_loss = 0
@@ -277,7 +277,9 @@ class UNetModel:
                                           global_step=self.iteration, dataformats='NCHW')
 
             if self.device == torch.device('cuda'):
-                self.training_writer.add_scalar('Max memory allocated', torch.cuda.max_memory_allocated(self.device), self.iteration)
+                allocated_memory = torch.cuda.max_memory_allocated(self.device)
+                logging.info('Memory allocated in current iteratio: {}{}'.format(allocated_memory, self.iteration))
+                self.training_writer.add_scalar('Max_memory_allocated', allocated_memory, self.iteration)
 
         self.net.train()
 
