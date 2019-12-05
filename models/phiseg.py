@@ -60,15 +60,19 @@ class Conv2DSequence(nn.Module):
 
 
 class ReversibleSequence(nn.Module):
-    """This class implements a a reversible sequence made out of n convolutions with ReLU activation and BN"""
-    def __init__(self, in_size, out_size, reversible_depth=3):
+    """This class implements a a reversible sequence made out of n convolutions with ReLU activation and BN
+        There is an initial 1x1 convolution to get to the desired number of channels.
+    """
+    def __init__(self, input_dim, output_dim, reversible_depth=3):
         super(ReversibleSequence, self).__init__()
+        self.inital_conv = Conv2D(input_dim, output_dim, kernel_size=1)
+
         blocks = []
         for i in range(reversible_depth):
 
             #f and g must both be a nn.Module whos output has the same shape as its input
-            f_func = nn.Sequential(Conv2D(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
-            g_func = nn.Sequential(Conv2D(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
+            f_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
+            g_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
 
             #we construct a reversible block with our F and G functions
             blocks.append(rv.ReversibleBlock(f_func, g_func))
@@ -77,10 +81,12 @@ class ReversibleSequence(nn.Module):
         self.sequence = rv.ReversibleSequence(nn.ModuleList(blocks))
 
     def forward(self, x):
+        x = self.inital_conv(x)
         return self.sequence(x)
 
+
 class DownConvolutionalBlock(nn.Module):
-    def __init__(self, input_dim, output_dim, initializers, depth=3, padding=True, pool=True):
+    def __init__(self, input_dim, output_dim, initializers, depth=3, padding=True, pool=True, reversible=False):
         super(DownConvolutionalBlock, self).__init__()
 
         if depth < 1:
@@ -90,11 +96,14 @@ class DownConvolutionalBlock(nn.Module):
         if pool:
             layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
-        layers.append(Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+        if reversible:
+            layers.append(ReversibleSequence(input_dim, output_dim))
+        else:
+            layers.append(Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
 
-        if depth > 1:
-            for i in range(depth-1):
-                layers.append(Conv2D(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            if depth > 1:
+                for i in range(depth-1):
+                    layers.append(Conv2D(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
 
         self.layers = nn.Sequential(*layers)
 
@@ -110,7 +119,7 @@ class UpConvolutionalBlock(nn.Module):
         If bilinear is set to false, we do a transposed convolution instead of upsampling
         """
 
-    def __init__(self, input_dim, output_dim, initializers, padding, bilinear=True):
+    def __init__(self, input_dim, output_dim, initializers, padding, bilinear=True, reversible=False):
         super(UpConvolutionalBlock, self).__init__()
         self.bilinear = bilinear
 
@@ -139,7 +148,7 @@ class SampleZBlock(nn.Module):
     Performs 2 3X3 convolutions and a 1x1 convolution to mu and sigma which are used as parameters for a Gaussian
     for generating z
     """
-    def __init__(self, input_dim, z_dim0=2, depth=2):
+    def __init__(self, input_dim, z_dim0=2, depth=2, reversible=False):
         super(SampleZBlock, self).__init__()
         self.input_dim = input_dim
 
@@ -173,7 +182,14 @@ class Posterior(nn.Module):
     input_channels : Number of input channels, 1 for greyscale,
     is_posterior: if True, the mask is concatenated to the input of the encoder, causing it to be a ConditionalVAE
     """
-    def __init__(self, input_channels, num_classes, num_filters, initializers=None, padding=True, is_posterior=True):
+    def __init__(self,
+                 input_channels,
+                 num_classes,
+                 num_filters,
+                 initializers=None,
+                 padding=True,
+                 is_posterior=True,
+                 reversible=False):
         super(Posterior, self).__init__()
         self.input_channels = input_channels
         self.num_filters = num_filters
@@ -272,7 +288,16 @@ def increase_resolution(times, input_dim, output_dim):
 
 class Likelihood(nn.Module):
     # TODO: add latent_level and resolution_levels to exp_config file
-    def __init__(self, input_channels, num_classes, num_filters, latent_levels=5, resolution_levels=7, initializers=None, apply_last_layer=True, padding=True):
+    def __init__(self,
+                 input_channels,
+                 num_classes,
+                 num_filters,
+                 latent_levels=5,
+                 resolution_levels=7,
+                 reversible=False,
+                 initializers=None,
+                 apply_last_layer=True,
+                 padding=True):
         super(Likelihood, self).__init__()
 
         self.input_channels = input_channels
@@ -281,8 +306,9 @@ class Likelihood(nn.Module):
 
         self.latent_levels = latent_levels
         self.resolution_levels = resolution_levels
-
         self.lvl_diff = resolution_levels - latent_levels
+
+        self.reversible= reversible
 
         self.padding = padding
         self.activation_maps = []
@@ -295,7 +321,10 @@ class Likelihood(nn.Module):
         for i in reversed(range(self.latent_levels)):
             input = self.num_filters[i]
             output = self.num_filters[i]
-            self.likelihood_ups_path.append(Conv2DSequence(input_dim=2, output_dim=input, depth=2))
+            if reversible:
+                self.likelihood_ups_path.append(ReversibleSequence(input_dim=2, output_dim=input, reversible_depth=2))
+            else:
+                self.likelihood_ups_path.append(Conv2DSequence(input_dim=2, output_dim=input, depth=2))
 
             self.likelihood_post_ups_path.append(increase_resolution(times=self.lvl_diff, input_dim=input, output_dim=input))
 
@@ -400,9 +429,12 @@ class PHISeg(nn.Module):
         self.kl_divergence_loss = 0
         self.reconstruction_loss = 0
 
-        self.posterior = Posterior(input_channels, num_classes, num_filters, initializers=None, padding=True)
-        self.likelihood = Likelihood(input_channels, num_classes, num_filters, initializers=None, apply_last_layer=True, padding=True)
-        self.prior = Posterior(input_channels, num_classes, num_filters, initializers=None, padding=True, is_posterior=False)
+        self.posterior = Posterior(input_channels, num_classes, num_filters,
+                                   initializers=None, padding=True, reversible=reversible)
+        self.likelihood = Likelihood(input_channels, num_classes, num_filters,
+                                     initializers=None, apply_last_layer=True, padding=True, reversible=reversible)
+        self.prior = Posterior(input_channels, num_classes, num_filters,
+                               initializers=None, padding=True, is_posterior=False, reversible=reversible)
 
         self.s_out_list = [None] * self.latent_levels
         self.s_out_list_with_softmax = [None] * self.latent_levels
