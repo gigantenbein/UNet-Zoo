@@ -46,11 +46,22 @@ class UNetModel:
                                     reversible=exp_config.use_reversible
                                     )
         self.exp_config = exp_config
+
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3, weight_decay=0)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer, 'min', min_lr=1e-4, verbose=True, patience=5000)
+
+        if exp_config.pretrained_model is not None:
+            logging.info('Loading pretrained model {}'.format(exp_config.pretrained_model))
+
+            model_path = os.path.join(sys_config.project_root, 'models', exp_config.pretrained_model)
+
+            if os.path.exists(model_path):
+                self.net.load_state_dict(torch.load(model_path))
+            else:
+                logging.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
 
         self.mean_loss_of_epoch = 0
         self.tot_loss = 0
@@ -290,7 +301,6 @@ class UNetModel:
         logging.info('saved model to .pth file in {}'.format(save_model_path))
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser(description="Script for training")
     parser.add_argument("EXP_PATH", type=str, help="Path to experiment config file")
     parser.add_argument("LOCAL", type=str, help="Is this script run on the local machine or the BIWI cluster?")

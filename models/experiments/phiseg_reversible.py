@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from models.phiseg import PHISeg
 from utils import normalise_image
-experiment_name = 'PHISeg'
+experiment_name = 'PHISegReversible'
 log_dir_name = 'lidc'
 
 # number of filter for the latent levels, they will be applied in the order as loaded into the list
@@ -40,5 +40,6 @@ num_validation_images = 100
 logging_frequency = 1000
 validation_frequency = 1000
 
+pretrained_model = None
 # model
 model = PHISeg

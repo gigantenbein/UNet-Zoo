@@ -40,5 +40,6 @@ num_validation_images = 100
 logging_frequency = 1000
 validation_frequency = 1000
 
+pretrained_model = 'PHISeg_best_ged.pth'
 # model
 model = PHISeg
