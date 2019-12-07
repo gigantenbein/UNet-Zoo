@@ -23,7 +23,7 @@ exponential_weighting = True
 # use 1 for grayscale, 3 for RGB images
 input_channels = 1
 epochs_to_train = 20
-batch_size = 12
+batch_size = 24
 image_size = (1, 128, 128)
 
 augmentation_options = {'do_flip_lr': True,
@@ -40,6 +40,8 @@ num_validation_images = 100
 logging_frequency = 1000
 validation_frequency = 1000
 
-pretrained_model = 'PHISeg_best_ged.pth'
+weight_decay = 10e-5
+
+pretrained_model = None #'PHISeg_best_ged.pth'
 # model
 model = PHISeg

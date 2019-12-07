@@ -51,7 +51,7 @@ class UNetModel:
         self.net.to(self.device)
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3, weight_decay=0)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, 'min', min_lr=1e-4, verbose=True, patience=5000)
+            self.optimizer, 'min', min_lr=1e-4, verbose=True, patience=50000)
 
         if exp_config.pretrained_model is not None:
             logging.info('Loading pretrained model {}'.format(exp_config.pretrained_model))
@@ -90,6 +90,10 @@ class UNetModel:
     def train(self, data):
         self.net.train()
         logging.info('Starting training.')
+        logging.info('Current filters: {}'.format(self.exp_config.filter_channels))
+        logging.info('Batch size: {}'.format(self.exp_config.batch_size))
+        logging.info('Net architecture: {}'.format(self.net))
+        print(self.net)
 
         for self.iteration in range(1, self.exp_config.iterations):
             x_b, s_b = data.train.next_batch(exp_config.batch_size)
@@ -289,8 +293,9 @@ class UNetModel:
 
             if self.device == torch.device('cuda'):
                 allocated_memory = torch.cuda.max_memory_allocated(self.device)
-                logging.info('Memory allocated in current iteratio: {}{}'.format(allocated_memory, self.iteration))
-                self.training_writer.add_scalar('Max_memory_allocated', allocated_memory, self.iteration)
+                alloc_mem_mb = allocated_memory//1e9
+                logging.info('Memory allocated in current iteration: {}{}'.format(alloc_mem_mb, self.iteration))
+                self.training_writer.add_scalar('Max_memory_allocated', alloc_mem_mb, self.iteration)
 
         self.net.train()
 

@@ -40,6 +40,8 @@ num_validation_images = 100
 logging_frequency = 1000
 validation_frequency = 1000
 
+weight_decay = 10e-5
+
 pretrained_model = None
 # model
 model = PHISeg

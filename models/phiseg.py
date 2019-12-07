@@ -65,7 +65,11 @@ class ReversibleSequence(nn.Module):
     """
     def __init__(self, input_dim, output_dim, reversible_depth=3):
         super(ReversibleSequence, self).__init__()
-        self.inital_conv = Conv2D(input_dim, output_dim, kernel_size=1)
+
+        if input_dim  != output_dim:
+            self.inital_conv = Conv2D(input_dim, output_dim, kernel_size=1)
+        else:
+            self.inital_conv = nn.Identity()
 
         blocks = []
         for i in range(reversible_depth):
@@ -124,10 +128,14 @@ class UpConvolutionalBlock(nn.Module):
         self.bilinear = bilinear
 
         if self.bilinear:
-            self.upconv_layer = nn.Sequential(
-                Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=1),
-                Conv2D(output_dim, output_dim, kernel_size=3, stride=1, padding=1),
-                )
+            if reversible:
+                self.upconv_layer = ReversibleSequence(input_dim, output_dim, reversible_depth=2)
+            else:
+                self.upconv_layer = nn.Sequential(
+                    Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=1),
+                    Conv2D(output_dim, output_dim, kernel_size=3, stride=1, padding=1),
+                    )
+
         else:
             raise NotImplementedError
 
@@ -153,8 +161,12 @@ class SampleZBlock(nn.Module):
         self.input_dim = input_dim
 
         layers = []
-        for i in range(depth):
-            layers.append(Conv2D(input_dim, input_dim, kernel_size=3, padding=1))
+
+        if reversible:
+            layers.append(ReversibleSequence(input_dim, input_dim, reversible_depth=3))
+        else:
+            for i in range(depth):
+                layers.append(Conv2D(input_dim, input_dim, kernel_size=3, padding=1))
 
         self.conv = nn.Sequential(*layers)
 
@@ -218,7 +230,8 @@ class Posterior(nn.Module):
                                                                 initializers,
                                                                 depth=3,
                                                                 padding=padding,
-                                                                pool=pool)
+                                                                pool=pool,
+                                                                reversible=reversible)
                                          )
 
         self.upsampling_path = nn.ModuleList()
@@ -226,16 +239,16 @@ class Posterior(nn.Module):
         for i in reversed(range(self.latent_levels)):  # iterates from [latent_levels -1, ... ,0]
             input = 2
             output = self.num_filters[0]*2
-            self.upsampling_path.append(UpConvolutionalBlock(input, output, initializers, padding))
+            self.upsampling_path.append(UpConvolutionalBlock(input, output, initializers, padding, reversible=reversible))
 
         self.sample_z_path = nn.ModuleList()
         for i in reversed(range(self.latent_levels)):
             input = 2*self.num_filters[0] + self.num_filters[i + self.lvl_diff]
             if i == self.latent_levels - 1:
                 input = self.num_filters[i + self.lvl_diff]
-                self.sample_z_path.append(SampleZBlock(input, depth=2))
+                self.sample_z_path.append(SampleZBlock(input, depth=2, reversible=reversible))
             else:
-                self.sample_z_path.append(SampleZBlock(input, depth=2))
+                self.sample_z_path.append(SampleZBlock(input, depth=2, reversible=reversible))
 
     def forward(self, patch, segm=None, training_prior=False, z_list=None):
         if segm is not None:
@@ -331,10 +344,13 @@ class Likelihood(nn.Module):
         # path after concatenation
         self.likelihood_post_c_path = nn.ModuleList()
         for i in range(latent_levels - 1):
-            input = self.num_filters[i] + self.num_filters[i + self.lvl_diff]
-            input = self.num_filters[i] + 192 # TODO: do not hardcode this
+            input = self.num_filters[i] + self.num_filters[i + 1 + self.lvl_diff]
             output = self.num_filters[i + self.lvl_diff]
-            self.likelihood_post_c_path.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2))
+
+            if reversible:
+                self.likelihood_post_c_path.append(ReversibleSequence(input_dim=input, output_dim=output, reversible_depth=2))
+            else:
+                self.likelihood_post_c_path.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2))
 
         self.s_layer = nn.ModuleList()
         output = self.num_classes
