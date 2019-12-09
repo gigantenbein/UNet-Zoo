@@ -23,7 +23,7 @@ exponential_weighting = True
 # use 1 for grayscale, 3 for RGB images
 input_channels = 1
 epochs_to_train = 20
-batch_size = 24
+batch_size = 32
 image_size = (1, 128, 128)
 
 augmentation_options = {'do_flip_lr': True,
