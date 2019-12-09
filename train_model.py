@@ -20,7 +20,6 @@ import math
 from data.lidc_data import lidc_data
 from load_LIDC_data import load_data_into_loader, create_pickle_data_with_n_samples
 import utils
-from test_model import test_segmentation
 from torchvision.transforms import Normalize
 
 # catch all the warnings with the debugger
@@ -293,11 +292,119 @@ class UNetModel:
 
             if self.device == torch.device('cuda'):
                 allocated_memory = torch.cuda.max_memory_allocated(self.device)
-                alloc_mem_mb = allocated_memory//1e9
-                logging.info('Memory allocated in current iteration: {}{}'.format(alloc_mem_mb, self.iteration))
-                self.training_writer.add_scalar('Max_memory_allocated', alloc_mem_mb, self.iteration)
+
+                logging.info('Memory allocated in current iteration: {}{}'.format(allocated_memory, self.iteration))
+                self.training_writer.add_scalar('Max_memory_allocated', allocated_memory, self.iteration)
 
         self.net.train()
+
+    def test(self, data, sys_config):
+        self.net.eval()
+        with torch.no_grad():
+
+            model_selection = self.exp_config.experiment_name + '_best_ged.pth'
+            logging.info('Testing {}'.format(model_selection))
+
+            logging.info('Loading pretrained model {}'.format(model_selection))
+
+            model_path = os.path.join(sys_config.project_root, 'models', model_selection)
+
+            if os.path.exists(model_path):
+                self.net.load_state_dict(torch.load(model_path))
+            else:
+                logging.info('The file {} does not exist. Aborting test function.'.format(model_path))
+                return
+
+            ged_list = []
+            dice_list = []
+            ncc_list = []
+
+            time_ = time.time()
+
+            n_samples = 100
+
+            for ii in range(data.test.images.shape[0]):
+
+                s_gt_arr = data.test.labels[ii, ...]
+
+                # from HW to NCHW
+                x_b = data.test.images[ii, ...]
+                patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
+                val_patch = patch.unsqueeze(dim=0).unsqueeze(dim=1)
+
+                s_b = s_gt_arr[:, :, np.random.choice(self.exp_config.annotator_range)]
+                mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
+                val_mask = mask.unsqueeze(dim=0).unsqueeze(dim=1)
+                val_masks = torch.tensor(s_gt_arr, dtype=torch.float32).to(self.device)  # HWC
+                val_masks = val_masks.transpose(0, 2).transpose(1, 2)  # CHW
+
+                patch_arrangement = val_patch.repeat((n_samples, 1, 1, 1))
+
+                mask_arrangement = val_mask.repeat((n_samples, 1, 1, 1))
+
+                self.mask = mask_arrangement
+                self.patch = patch_arrangement
+
+                # training=True for constructing posterior as well
+                s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
+                s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
+
+                s_prediction_softmax_mean = torch.mean(s_prediction_softmax_arrangement, axis=0)
+                s_prediction_arrangement = torch.argmax(s_prediction_softmax_arrangement, dim=1)
+
+                ground_truth_arrangement = val_masks  # nlabels, H, W
+                ged = utils.generalised_energy_distance(s_prediction_arrangement, ground_truth_arrangement,
+                                                        nlabels=self.exp_config.n_classes - 1,
+                                                        label_range=range(1, self.exp_config.n_classes))
+
+                # num_gts, nlabels, H, W
+                s_gt_arr_r = val_masks.unsqueeze(dim=1)
+                ground_truth_arrangement_one_hot = utils.convert_batch_to_onehot(s_gt_arr_r,
+                                                                                 nlabels=self.exp_config.n_classes)
+                ncc = utils.variance_ncc_dist(s_prediction_softmax_arrangement, ground_truth_arrangement_one_hot)
+
+                s_ = torch.argmax(s_prediction_softmax_mean, dim=0)  # HW
+                s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1])  # HW
+
+                # Write losses to list
+                per_lbl_dice = []
+                for lbl in range(self.exp_config.n_classes):
+                    binary_pred = (s_ == lbl) * 1
+                    binary_gt = (s == lbl) * 1
+
+                    if torch.sum(binary_gt) == 0 and torch.sum(binary_pred) == 0:
+                        per_lbl_dice.append(1.0)
+                    elif torch.sum(binary_pred) > 0 and torch.sum(binary_gt) == 0 or torch.sum(
+                            binary_pred) == 0 and torch.sum(
+                            binary_gt) > 0:
+                        per_lbl_dice.append(0.0)
+                    else:
+                        per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(), binary_gt.detach().cpu().numpy()))
+
+                dice_list.append(per_lbl_dice)
+
+                ged_list.append(ged)
+                ncc_list.append(ncc)
+
+            dice_tensor = torch.tensor(dice_list)
+            per_structure_dice = dice_tensor.mean(dim=0)
+
+            ged_tensor = torch.tensor(ged_list)
+            ncc_tensor = torch.tensor(ncc_list)
+
+            self.avg_dice = torch.mean(dice_tensor)
+            self.foreground_dice = torch.mean(dice_tensor, dim=0)[1]
+
+            self.avg_ged = torch.mean(ged_tensor)
+            self.avg_ncc = torch.mean(ncc_tensor)
+
+            logging.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
+            logging.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+            logging.info(' - Mean GED: %.4f' % self.avg_ged)
+            logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
+
+
+            logging.info('Testing took {} seconds'.format(time.time() - time_))
 
     def save_model(self, savename):
         model_name = self.exp_config.experiment_name + '_' + savename + '.pth'
@@ -342,7 +449,5 @@ if __name__ == '__main__':
 
     data = lidc_data(sys_config=sys_config, exp_config=exp_config)
     model.train(data)
-
-
 
     model.save_model()
