@@ -349,7 +349,7 @@ class Likelihood(nn.Module):
 
             if reversible:
                 self.likelihood_post_c_path.append(ReversibleSequence(input_dim=input, output_dim=output, depth=2))
-            else
+            else:
                 self.likelihood_post_c_path.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2))
 
         self.s_layer = nn.ModuleList()
