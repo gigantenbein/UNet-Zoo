@@ -34,7 +34,7 @@ class UNetModel:
         Args:
             exp_config: Experiment configuration file as given in the experiment folder
     '''
-    def __init__(self, exp_config):
+    def __init__(self, exp_config, batch_size):
 
         self.net = exp_config.model(input_channels=exp_config.input_channels,
                                     num_classes=exp_config.n_classes,
@@ -45,6 +45,7 @@ class UNetModel:
                                     reversible=exp_config.use_reversible
                                     )
         self.exp_config = exp_config
+        self.batch_size = batch_size
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
@@ -90,12 +91,10 @@ class UNetModel:
         self.net.train()
         logging.info('Starting training.')
         logging.info('Current filters: {}'.format(self.exp_config.filter_channels))
-        logging.info('Batch size: {}'.format(self.exp_config.batch_size))
-        logging.info('Net architecture: {}'.format(self.net))
-        print(self.net)
+        logging.info('Batch size: {}'.format(self.batch_size))
 
         for self.iteration in range(1, self.exp_config.iterations):
-            x_b, s_b = data.train.next_batch(exp_config.batch_size)
+            x_b, s_b = data.train.next_batch(self.batch_size)
 
             patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
 
@@ -417,6 +416,7 @@ if __name__ == '__main__':
     parser.add_argument("EXP_PATH", type=str, help="Path to experiment config file")
     parser.add_argument("LOCAL", type=str, help="Is this script run on the local machine or the BIWI cluster?")
     parser.add_argument("dummy", type=str, help="Is the module run with dummy training?")
+    parser.add_argument("BatchSize", type=int, help="batch size")
     args = parser.parse_args()
 
     config_file = args.EXP_PATH
@@ -444,7 +444,7 @@ if __name__ == '__main__':
     logging.info(' *** Running Experiment: %s', exp_config.experiment_name)
     logging.info('**************************************************************')
 
-    model = UNetModel(exp_config)
+    model = UNetModel(exp_config, batch_size=args.BatchSize)
     transform = None
 
     data = lidc_data(sys_config=sys_config, exp_config=exp_config)
