@@ -348,7 +348,7 @@ class Likelihood(nn.Module):
             output = self.num_filters[i + self.lvl_diff]
 
             if reversible:
-                self.likelihood_post_c_path.append(ReversibleSequence(input_dim=input, output_dim=output, depth=2))
+                self.likelihood_post_c_path.append(ReversibleSequence(input_dim=input, output_dim=output, reversible_depth=2))
             else:
                 self.likelihood_post_c_path.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2))
 
