@@ -2,8 +2,11 @@ import torch
 import torch.nn as nn
 from models.phiseg import PHISeg
 from utils import normalise_image
+from data.lidc_data import lidc_data
 experiment_name = 'PHISegReversible'
 log_dir_name = 'lidc'
+
+data_loader = lidc_data
 
 # number of filter for the latent levels, they will be applied in the order as loaded into the list
 filter_channels = [32, 64, 128, 192, 192, 192, 192]

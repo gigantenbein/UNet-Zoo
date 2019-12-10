@@ -1,9 +1,5 @@
 import torch
 import numpy as np
-
-import torchvision
-from torchvision.utils import save_image
-import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter, FileWriter
 
 # Python bundle packages
@@ -17,15 +13,11 @@ from medpy.metric import dc
 import math
 
 # own files
-from data.lidc_data import lidc_data
-from load_LIDC_data import load_data_into_loader, create_pickle_data_with_n_samples
 import utils
-from torchvision.transforms import Normalize
 
 # catch all the warnings with the debugger
 # import warnings
 # warnings.filterwarnings('error')
-from utils import show_tensor
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 
@@ -42,6 +34,7 @@ class UNetModel:
                                     latent_levels=exp_config.latent_levels,
                                     no_convs_fcomb=exp_config.no_convs_fcomb,
                                     beta=exp_config.beta,
+                                    image_size=exp_config.image_size,
                                     reversible=exp_config.use_reversible
                                     )
         self.exp_config = exp_config
@@ -286,8 +279,10 @@ class UNetModel:
             sample1 = torch.chunk(sample, 2, dim=1)[self.exp_config.n_classes-1]
 
             self.training_writer.add_image('Patch/GT/Sample',
-                                          torch.cat([self.patch, self.mask.view(-1, 1, 128, 128), sample1], dim=2),
-                                          global_step=self.iteration, dataformats='NCHW')
+                                          torch.cat([self.patch,
+                                                     self.mask.view(-1, 1, self.exp_config.image_size[1],
+                                                                    self.exp_config.image_size[2]), sample1],
+                                                    dim=2), global_step=self.iteration, dataformats='NCHW')
 
             if self.device == torch.device('cuda'):
                 allocated_memory = torch.cuda.max_memory_allocated(self.device)
@@ -447,7 +442,10 @@ if __name__ == '__main__':
     model = UNetModel(exp_config, batch_size=args.BatchSize)
     transform = None
 
-    data = lidc_data(sys_config=sys_config, exp_config=exp_config)
+    #data = lidc_data(sys_config=sys_config, exp_config=exp_config)
+
+    # this loads either lidc or uzh data
+    data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)
     model.train(data)
 
     model.save_model()

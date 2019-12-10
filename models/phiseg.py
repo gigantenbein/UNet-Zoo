@@ -307,6 +307,7 @@ class Likelihood(nn.Module):
                  num_filters,
                  latent_levels=5,
                  resolution_levels=7,
+                 image_size=(128,128,1),
                  reversible=False,
                  initializers=None,
                  apply_last_layer=True,
@@ -321,6 +322,7 @@ class Likelihood(nn.Module):
         self.resolution_levels = resolution_levels
         self.lvl_diff = resolution_levels - latent_levels
 
+        self.image_size = image_size
         self.reversible= reversible
 
         self.padding = padding
@@ -368,11 +370,11 @@ class Likelihood(nn.Module):
         # start from the downmost layer and the last filter
         for i in range(self.latent_levels):
             assert z[-i-1].shape[1] == 2
-            assert z[-i-1].shape[2] == 128 * 2**(-self.resolution_levels + 1 + i)
+            assert z[-i-1].shape[2] == self.image_size[1] * 2**(-self.resolution_levels + 1 + i)
             post_z[-i - 1] = self.likelihood_ups_path[i](z[-i - 1])
 
             post_z[-i - 1] = self.likelihood_post_ups_path[i](post_z[-i - 1])
-            assert post_z[-i - 1].shape[2] == 128 * 2 ** (-self.latent_levels + i + 1)
+            assert post_z[-i - 1].shape[2] == self.image_size[1] * 2 ** (-self.latent_levels + i + 1)
             assert post_z[-i-1].shape[1] == self.num_filters[-i-1 - self.lvl_diff], '{} != {}'.format(post_z[-i-1].shape[1],self.num_filters[-i-1])
 
         post_c[self.latent_levels - 1] = post_z[self.latent_levels - 1]
@@ -394,7 +396,7 @@ class Likelihood(nn.Module):
 
         for i, block in enumerate(self.s_layer):
             s_in = block(post_c[-i-1]) # no activation in the last layer
-            s[-i-1] = torch.nn.functional.interpolate(s_in, size=[128, 128], mode='nearest')
+            s[-i-1] = torch.nn.functional.interpolate(s_in, size=[self.image_size[1], self.image_size[2]], mode='nearest')
 
         return s
 
@@ -417,6 +419,7 @@ class PHISeg(nn.Module):
                  initializers=None,
                  no_convs_fcomb=4,
                  beta=10.0,
+                 image_size=(128,128,1),
                  reversible=False,
                  apply_last_layer=True,
                  exponential_weighting=True,
@@ -427,6 +430,7 @@ class PHISeg(nn.Module):
         self.num_filters = num_filters
 
         self.latent_levels = latent_levels
+        self.image_size = image_size
 
         self.loss_tot = 0
 
@@ -448,7 +452,8 @@ class PHISeg(nn.Module):
         self.posterior = Posterior(input_channels, num_classes, num_filters,
                                    initializers=None, padding=True, reversible=reversible)
         self.likelihood = Likelihood(input_channels, num_classes, num_filters,
-                                     initializers=None, apply_last_layer=True, padding=True, reversible=reversible)
+                                     initializers=None, apply_last_layer=True, padding=True, image_size=self.image_size,
+                                     reversible=reversible)
         self.prior = Posterior(input_channels, num_classes, num_filters,
                                initializers=None, padding=True, is_posterior=False, reversible=reversible)
 

@@ -11,4 +11,7 @@ data_root = '/scratch_net/airfox/ganmarc/data/'
 dummy_data_root = None
 
 data_root = '/scratch_net/airfox/ganmarc/data/data_lidc.pickle'
+
+uzh_root = '/scratch_net/airfox/ganmarc/data/prostate_original.mat'
+
 preproc_folder = '/scratch_net/airfox/ganmarc/data/preproc'

@@ -107,7 +107,7 @@ def normalise_image(image):
     img_o = np.float32(image.copy())
     m = np.mean(img_o)
     s = np.std(img_o)
-    return np.divide((img_o - m), s)
+    return np.divide((img_o - m), s + 1e-6)
 
 
 def normalise_images(X):
