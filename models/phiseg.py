@@ -11,10 +11,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 from utils import show_tensor
 
 
-class Conv3D(nn.Module):
+class Conv2D(nn.Module):
     def __init__(self, input_dim, output_dim, stride=1, kernel_size=3, padding=1, activation=torch.nn.ReLU, norm=torch.nn.BatchNorm2d,
                  norm_before_activation=True):
-        super(Conv3D, self).__init__()
+        super(Conv2D, self).__init__()
 
         if kernel_size == 3:
             padding = 1
@@ -22,7 +22,7 @@ class Conv3D(nn.Module):
             padding = 0
 
         layers = []
-        layers.append(nn.Conv3d(input_dim, output_dim, kernel_size=kernel_size, padding=padding, stride=stride))
+        layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=kernel_size, padding=padding, stride=stride))
         if norm_before_activation:
             layers.append(norm(num_features=output_dim, eps=1e-3, momentum=0.01))
             layers.append(activation())
@@ -36,10 +36,10 @@ class Conv3D(nn.Module):
         return self.convolution(x)
 
 
-class Conv3DSequence(nn.Module):
+class Conv2DSequence(nn.Module):
     """Block with 2D convolutions after each other with ReLU activation"""
     def __init__(self, input_dim, output_dim, kernel=3, depth=2, activation=torch.nn.ReLU, norm=torch.nn.BatchNorm2d, norm_before_activation=True):
-        super(Conv3DSequence, self).__init__()
+        super(Conv2DSequence, self).__init__()
 
         assert depth >= 1
         if kernel == 3:
@@ -48,10 +48,10 @@ class Conv3DSequence(nn.Module):
             padding = 0
 
         layers = []
-        layers.append(Conv3D(input_dim, output_dim, kernel_size=kernel, padding=padding, activation=activation, norm=norm))
+        layers.append(Conv2D(input_dim, output_dim, kernel_size=kernel, padding=padding, activation=activation, norm=norm))
 
         for i in range(depth-1):
-            layers.append(Conv3D(output_dim, output_dim, kernel_size=kernel, padding=padding, activation=activation, norm=norm))
+            layers.append(Conv2D(output_dim, output_dim, kernel_size=kernel, padding=padding, activation=activation, norm=norm))
 
         self.convolution = nn.Sequential(*layers)
 
@@ -67,7 +67,7 @@ class ReversibleSequence(nn.Module):
         super(ReversibleSequence, self).__init__()
 
         if input_dim  != output_dim:
-            self.inital_conv = Conv3D(input_dim, output_dim, kernel_size=1)
+            self.inital_conv = Conv2D(input_dim, output_dim, kernel_size=1)
         else:
             self.inital_conv = nn.Identity()
 
@@ -75,8 +75,8 @@ class ReversibleSequence(nn.Module):
         for i in range(reversible_depth):
 
             #f and g must both be a nn.Module whos output has the same shape as its input
-            f_func = nn.Sequential(Conv3D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
-            g_func = nn.Sequential(Conv3D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
+            f_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
+            g_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
 
             #we construct a reversible block with our F and G functions
             blocks.append(rv.ReversibleBlock(f_func, g_func))
@@ -98,16 +98,16 @@ class DownConvolutionalBlock(nn.Module):
 
         layers = []
         if pool:
-            layers.append(nn.AvgPool3d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
+            layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
         if reversible:
             layers.append(ReversibleSequence(input_dim, output_dim))
         else:
-            layers.append(Conv3D(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
 
             if depth > 1:
                 for i in range(depth-1):
-                    layers.append(Conv3D(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+                    layers.append(Conv2D(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
 
         self.layers = nn.Sequential(*layers)
 
@@ -132,8 +132,8 @@ class UpConvolutionalBlock(nn.Module):
                 self.upconv_layer = ReversibleSequence(input_dim, output_dim, reversible_depth=2)
             else:
                 self.upconv_layer = nn.Sequential(
-                    Conv3D(input_dim, output_dim, kernel_size=3, stride=1, padding=1),
-                    Conv3D(output_dim, output_dim, kernel_size=3, stride=1, padding=1),
+                    Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=1),
+                    Conv2D(output_dim, output_dim, kernel_size=3, stride=1, padding=1),
                     )
 
         else:
@@ -166,12 +166,12 @@ class SampleZBlock(nn.Module):
             layers.append(ReversibleSequence(input_dim, input_dim, reversible_depth=3))
         else:
             for i in range(depth):
-                layers.append(Conv3D(input_dim, input_dim, kernel_size=3, padding=1))
+                layers.append(Conv2D(input_dim, input_dim, kernel_size=3, padding=1))
 
         self.conv = nn.Sequential(*layers)
 
-        self.mu_conv = nn.Sequential(nn.Conv3d(input_dim, z_dim0, kernel_size=1))
-        self.sigma_conv = nn.Sequential(nn.Conv3d(input_dim, z_dim0, kernel_size=1),
+        self.mu_conv = nn.Sequential(nn.Conv2d(input_dim, z_dim0, kernel_size=1))
+        self.sigma_conv = nn.Sequential(nn.Conv2d(input_dim, z_dim0, kernel_size=1),
                                         nn.Softplus())
 
     def forward(self, pre_z):
@@ -294,7 +294,7 @@ def increase_resolution(times, input_dim, output_dim):
                     align_corners=True))
         if i != 0:
             input_dim = output_dim
-        module_list.append(Conv3DSequence(input_dim=input_dim, output_dim=output_dim, depth=1))
+        module_list.append(Conv2DSequence(input_dim=input_dim, output_dim=output_dim, depth=1))
 
     return nn.Sequential(*module_list)
 
@@ -339,7 +339,7 @@ class Likelihood(nn.Module):
             if reversible:
                 self.likelihood_ups_path.append(ReversibleSequence(input_dim=2, output_dim=input, reversible_depth=2))
             else:
-                self.likelihood_ups_path.append(Conv3DSequence(input_dim=2, output_dim=input, depth=2))
+                self.likelihood_ups_path.append(Conv2DSequence(input_dim=2, output_dim=input, depth=2))
 
             self.likelihood_post_ups_path.append(increase_resolution(times=self.lvl_diff, input_dim=input, output_dim=input))
 
@@ -352,13 +352,13 @@ class Likelihood(nn.Module):
             if reversible:
                 self.likelihood_post_c_path.append(ReversibleSequence(input_dim=input, output_dim=output, reversible_depth=2))
             else:
-                self.likelihood_post_c_path.append(Conv3DSequence(input_dim=input, output_dim=output, depth=2))
+                self.likelihood_post_c_path.append(Conv2DSequence(input_dim=input, output_dim=output, depth=2))
 
         self.s_layer = nn.ModuleList()
         output = self.num_classes
         for i in reversed(range(self.latent_levels)):
             input = self.num_filters[i + self.lvl_diff]
-            self.s_layer.append(Conv3DSequence(
+            self.s_layer.append(Conv2DSequence(
                 input_dim=input, output_dim=output, depth=1, kernel=1, activation=torch.nn.Identity, norm=torch.nn.Identity))
 
     def forward(self, z):

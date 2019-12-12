@@ -37,13 +37,13 @@ class Encoder(nn.Module):
             output_dim = num_filters[i]
 
             if i != 0:
-                layers.append(nn.AvgPool3d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
+                layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
-            layers.append(nn.Conv3d(input_dim, output_dim, kernel_size=3, padding=int(padding)))
+            layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, padding=int(padding)))
             layers.append(nn.ReLU(inplace=True))
 
             for _ in range(no_convs_per_block - 1):
-                layers.append(nn.Conv3d(output_dim, output_dim, kernel_size=3, padding=int(padding)))
+                layers.append(nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=int(padding)))
                 layers.append(nn.ReLU(inplace=True))
 
         self.layers = nn.Sequential(*layers)
@@ -74,7 +74,7 @@ class AxisAlignedConvGaussian(nn.Module):
             self.name = 'Prior'
         self.encoder = Encoder(self.input_channels, self.num_filters, self.no_convs_per_block, initializers,
                                posterior=self.posterior)
-        self.conv_layer = nn.Conv3d(num_filters[-1], 2 * self.latent_dim, (1, 1), stride=1)
+        self.conv_layer = nn.Conv2d(num_filters[-1], 2 * self.latent_dim, (1, 1), stride=1)
         self.show_img = 0
         self.show_seg = 0
         self.show_concat = 0
@@ -140,16 +140,16 @@ class Fcomb(nn.Module):
             layers = []
 
             # Decoder of N x a 1x1 convolution followed by a ReLU activation function except for the last layer
-            layers.append(nn.Conv3d(self.num_filters[0] + self.latent_dim, self.num_filters[0], kernel_size=1))
+            layers.append(nn.Conv2d(self.num_filters[0] + self.latent_dim, self.num_filters[0], kernel_size=1))
             layers.append(nn.ReLU(inplace=True))
 
             for _ in range(no_convs_fcomb - 2):
-                layers.append(nn.Conv3d(self.num_filters[0], self.num_filters[0], kernel_size=1))
+                layers.append(nn.Conv2d(self.num_filters[0], self.num_filters[0], kernel_size=1))
                 layers.append(nn.ReLU(inplace=True))
 
             self.layers = nn.Sequential(*layers)
 
-            self.last_layer = nn.Conv3d(self.num_filters[0], self.num_classes, kernel_size=1)
+            self.last_layer = nn.Conv2d(self.num_filters[0], self.num_classes, kernel_size=1)
 
             if initializers['w'] == 'orthogonal':
                 self.layers.apply(init_weights_orthogonal_normal)

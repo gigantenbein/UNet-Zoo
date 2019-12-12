@@ -12,8 +12,8 @@ class ReversibleSequence(nn.Module):
         for i in range(reversible_depth):
 
             #f and g must both be a nn.Module whos output has the same shape as its input
-            f_func = nn.Sequential(nn.Conv3d(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
-            g_func = nn.Sequential(nn.Conv3d(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
+            f_func = nn.Sequential(nn.Conv2d(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
+            g_func = nn.Sequential(nn.Conv2d(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
 
             #we construct a reversible block with our F and G functions
             blocks.append(rv.ReversibleBlock(f_func, g_func))
@@ -35,18 +35,18 @@ class DownConvBlock(nn.Module):
         layers = []
 
         if pool:
-            layers.append(nn.AvgPool3d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
+            layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
         if not reversible:
-            layers.append(nn.Conv3d(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
             layers.append(nn.ReLU(inplace=True))
-            layers.append(nn.Conv3d(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
             layers.append(nn.ReLU(inplace=True))
-            layers.append(nn.Conv3d(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
             layers.append(nn.ReLU(inplace=True))
             self.layers = nn.Sequential(*layers)
         else:
-            layers.append(nn.Conv3d(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
+            layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
             layers.append(nn.ReLU(inplace=True))
             layers.append(ReversibleSequence(output_dim, output_dim))
 
@@ -137,7 +137,7 @@ class Unet(nn.Module):
             self.upsampling_path.append(UpConvBlock(input, output, initializers, padding, reversible=reversible))
 
         if self.apply_last_layer:
-            self.last_layer = nn.Conv3d(output, num_classes, kernel_size=1)
+            self.last_layer = nn.Conv2d(output, num_classes, kernel_size=1)
             #nn.init.kaiming_normal_(self.last_layer.weight, mode='fan_in',nonlinearity='relu')
             #nn.init.normal_(self.last_layer.bias)
 
