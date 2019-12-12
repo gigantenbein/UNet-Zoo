@@ -7,12 +7,11 @@ import revtorch as rv
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
-# TODO: only debugging
 from utils import show_tensor
 
 
 class Conv3D(nn.Module):
-    def __init__(self, input_dim, output_dim, stride=1, kernel_size=3, padding=1, activation=torch.nn.ReLU, norm=torch.nn.BatchNorm2d,
+    def __init__(self, input_dim, output_dim, stride=1, kernel_size=3, padding=1, activation=torch.nn.ReLU, norm=torch.nn.BatchNorm3d,
                  norm_before_activation=True):
         super(Conv3D, self).__init__()
 
@@ -401,7 +400,7 @@ class Likelihood(nn.Module):
         return s
 
 
-class PHISeg(nn.Module):
+class PHISeg3D(nn.Module):
     """
     A PHISeg (https://arxiv.org/abs/1906.04045) implementation.
     input_channels: the number of channels in the image (1 for greyscale and 3 for RGB)
@@ -424,7 +423,7 @@ class PHISeg(nn.Module):
                  apply_last_layer=True,
                  exponential_weighting=True,
                  padding=True):
-        super(PHISeg, self).__init__()
+        super(PHISeg3D, self).__init__()
         self.input_channels = input_channels
         self.num_classes = num_classes
         self.num_filters = num_filters
