@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 
 import utils
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+logging.basicConfig(level=basic_logger.info, format='%(asctime)s %(message)s')
 
 def crop_or_pad_slice_to_size(slice, nx, ny):
     x, y = slice.shape
@@ -126,11 +126,11 @@ def load_and_maybe_process_data(input_file,
     utils.makefolder(preprocessing_folder)
 
     if not os.path.exists(data_file_path) or force_overwrite:
-        logging.info('This configuration of mode, size and target resolution has not yet been preprocessed')
-        logging.info('Preprocessing now!')
+        basic_logger.info('This configuration of mode, size and target resolution has not yet been preprocessed')
+        basic_logger.info('Preprocessing now!')
         prepare_data(input_file, data_file_path)
     else:
-        logging.info('Already preprocessed this configuration. Loading now!')
+        basic_logger.info('Already preprocessed this configuration. Loading now!')
 
     return h5py.File(data_file_path, 'r')
 

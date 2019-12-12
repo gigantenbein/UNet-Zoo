@@ -32,7 +32,7 @@ if __name__ == '__main__':
     else:
         import config.system as sys_config
 
-    logging.info('Running experiment with script: {}'.format(config_file))
+    basic_logger.info('Running experiment with script: {}'.format(config_file))
 
     exp_config = SourceFileLoader(config_module, config_file).load_module()
 
@@ -41,11 +41,11 @@ if __name__ == '__main__':
     utils.makefolder(log_dir)
 
     shutil.copy(exp_config.__file__, log_dir)
-    logging.info('!!!! Copied exp_config file to experiment folder !!!!')
+    basic_logger.info('!!!! Copied exp_config file to experiment folder !!!!')
 
-    logging.info('**************************************************************')
-    logging.info(' *** Running Experiment: %s', exp_config.experiment_name)
-    logging.info('**************************************************************')
+    basic_logger.info('**************************************************************')
+    basic_logger.info(' *** Running Experiment: %s', exp_config.experiment_name)
+    basic_logger.info('**************************************************************')
 
     model = UNetModel(exp_config)
     transform = None

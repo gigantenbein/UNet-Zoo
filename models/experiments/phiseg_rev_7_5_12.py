@@ -1,13 +1,12 @@
 import torch
 import torch.nn as nn
 from models.phiseg import PHISeg
-from data.lidc_data import lidc_data
 from utils import normalise_image
-
-experiment_name = 'PHISeg'
+from data.lidc_data import lidc_data
+experiment_name = 'PHISegRev_7_5_12'
 log_dir_name = 'lidc'
 
-data_loader=lidc_data
+data_loader = lidc_data
 
 # number of filter for the latent levels, they will be applied in the order as loaded into the list
 filter_channels = [32, 64, 128, 192, 192, 192, 192]
@@ -21,13 +20,13 @@ num_labels_per_subject = 4
 no_convs_fcomb = 4 # not used
 beta = 10.0 # not used
 #
-use_reversible = False
+use_reversible = True
 exponential_weighting = True
 
 # use 1 for grayscale, 3 for RGB images
 input_channels = 1
 epochs_to_train = 20
-batch_size = 32
+batch_size = 12
 image_size = (1, 128, 128)
 
 augmentation_options = {'do_flip_lr': True,
@@ -46,6 +45,6 @@ validation_frequency = 1000
 
 weight_decay = 10e-5
 
-pretrained_model = None #'PHISeg_best_ged.pth'
+pretrained_model = None
 # model
 model = PHISeg

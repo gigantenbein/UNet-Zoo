@@ -26,7 +26,7 @@ class UNetModel:
         Args:
             exp_config: Experiment configuration file as given in the experiment folder
     '''
-    def __init__(self, exp_config, batch_size):
+    def __init__(self, exp_config):
 
         self.net = exp_config.model(input_channels=exp_config.input_channels,
                                     num_classes=exp_config.n_classes,
@@ -38,7 +38,7 @@ class UNetModel:
                                     reversible=exp_config.use_reversible
                                     )
         self.exp_config = exp_config
-        self.batch_size = batch_size
+        self.batch_size = exp_config.batch_size
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
@@ -47,14 +47,14 @@ class UNetModel:
             self.optimizer, 'min', min_lr=1e-4, verbose=True, patience=50000)
 
         if exp_config.pretrained_model is not None:
-            logging.info('Loading pretrained model {}'.format(exp_config.pretrained_model))
+            basic_logger.info('Loading pretrained model {}'.format(exp_config.pretrained_model))
 
             model_path = os.path.join(sys_config.project_root, 'models', exp_config.pretrained_model)
 
             if os.path.exists(model_path):
                 self.net.load_state_dict(torch.load(model_path))
             else:
-                logging.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
+                basic_logger.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
 
         self.mean_loss_of_epoch = 0
         self.tot_loss = 0
@@ -82,9 +82,9 @@ class UNetModel:
 
     def train(self, data):
         self.net.train()
-        logging.info('Starting training.')
-        logging.info('Current filters: {}'.format(self.exp_config.filter_channels))
-        logging.info('Batch size: {}'.format(self.batch_size))
+        basic_logger.info('Starting training.')
+        basic_logger.info('Current filters: {}'.format(self.exp_config.filter_channels))
+        basic_logger.info('Batch size: {}'.format(self.batch_size))
 
         for self.iteration in range(1, self.exp_config.iterations):
             x_b, s_b = data.train.next_batch(self.batch_size)
@@ -113,7 +113,7 @@ class UNetModel:
                 self.validate(data)
 
             if self.iteration % self.exp_config.logging_frequency == 0:
-                logging.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
+                basic_logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
                 self._create_tensorboard_summary()
                 self.tot_loss = 0
                 self.kl_loss = 0
@@ -121,14 +121,14 @@ class UNetModel:
 
             self.scheduler.step(self.loss)
 
-        logging.info('Finished training.')
+        basic_logger.info('Finished training.')
 
     def validate(self, data):
         self.net.eval()
         with torch.no_grad():
-            logging.info('Validation for step {}'.format(self.iteration))
+            basic_logger.info('Validation for step {}'.format(self.iteration))
 
-            logging.info('Checkpointing model.')
+            basic_logger.info('Checkpointing model.')
             self.save_model('validation_ckpt')
 
             ged_list = []
@@ -232,29 +232,29 @@ class UNetModel:
             self.avg_ged = torch.mean(ged_tensor)
             self.avg_ncc = torch.mean(ncc_tensor)
 
-            logging.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
-            logging.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
-            logging.info(' - Mean GED: %.4f' % self.avg_ged)
-            logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
+            basic_logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
+            basic_logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+            basic_logger.info(' - Mean GED: %.4f' % self.avg_ged)
+            basic_logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
 
             if torch.mean(per_structure_dice) >= self.best_dice:
                 self.best_dice = torch.mean(per_structure_dice)
-                logging.info('New best validation Dice! (%.3f)' % self.best_dice)
+                basic_logger.info('New best validation Dice! (%.3f)' % self.best_dice)
                 self.save_model(savename='best_dice')
             if self.val_elbo <= self.best_loss:
                 self.best_loss = self.val_elbo
-                logging.info('New best validation loss! (%.3f)' % self.best_loss)
+                basic_logger.info('New best validation loss! (%.3f)' % self.best_loss)
                 self.save_model(savename='best_loss')
             if self.avg_ged <= self.best_ged:
                 self.best_ged = self.avg_ged
-                logging.info('New best GED score! (%.3f)' % self.best_ged)
+                basic_logger.info('New best GED score! (%.3f)' % self.best_ged)
                 self.save_model(savename='best_ged')
             if self.avg_ncc >= self.best_ncc:
                 self.best_ncc = self.avg_ncc
-                logging.info('New best NCC score! (%.3f)' % self.best_ncc)
+                basic_logger.info('New best NCC score! (%.3f)' % self.best_ncc)
                 self.save_model(savename='best_ncc')
 
-            logging.info('Validation took {} seconds'.format(time.time()-time_))
+            basic_logger.info('Validation took {} seconds'.format(time.time()-time_))
 
         self.net.train()
 
@@ -287,7 +287,7 @@ class UNetModel:
             if self.device == torch.device('cuda'):
                 allocated_memory = torch.cuda.max_memory_allocated(self.device)
 
-                logging.info('Memory allocated in current iteration: {}{}'.format(allocated_memory, self.iteration))
+                basic_logger.info('Memory allocated in current iteration: {}{}'.format(allocated_memory, self.iteration))
                 self.training_writer.add_scalar('Max_memory_allocated', allocated_memory, self.iteration)
 
         self.net.train()
@@ -297,16 +297,16 @@ class UNetModel:
         with torch.no_grad():
 
             model_selection = self.exp_config.experiment_name + '_best_ged.pth'
-            logging.info('Testing {}'.format(model_selection))
+            basic_logger.info('Testing {}'.format(model_selection))
 
-            logging.info('Loading pretrained model {}'.format(model_selection))
+            basic_logger.info('Loading pretrained model {}'.format(model_selection))
 
             model_path = os.path.join(sys_config.project_root, 'models', model_selection)
 
             if os.path.exists(model_path):
                 self.net.load_state_dict(torch.load(model_path))
             else:
-                logging.info('The file {} does not exist. Aborting test function.'.format(model_path))
+                basic_logger.info('The file {} does not exist. Aborting test function.'.format(model_path))
                 return
 
             ged_list = []
@@ -392,26 +392,43 @@ class UNetModel:
             self.avg_ged = torch.mean(ged_tensor)
             self.avg_ncc = torch.mean(ncc_tensor)
 
-            logging.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
-            logging.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
-            logging.info(' - Mean GED: %.4f' % self.avg_ged)
-            logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
+            basic_logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
+            basic_logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+            basic_logger.info(' - Mean GED: %.4f' % self.avg_ged)
+            basic_logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
 
 
-            logging.info('Testing took {} seconds'.format(time.time() - time_))
+            basic_logger.info('Testing took {} seconds'.format(time.time() - time_))
 
     def save_model(self, savename):
         model_name = self.exp_config.experiment_name + '_' + savename + '.pth'
-        save_model_path = os.path.join(sys_config.project_root, 'models', model_name)
+
+        log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
+        save_model_path = os.path.join(log_dir, model_name)
         torch.save(self.net.state_dict(), save_model_path)
-        logging.info('saved model to .pth file in {}'.format(save_model_path))
+        basic_logger.info('saved model to .pth file in {}'.format(save_model_path))
+
+    def _setup_log_dir_and_continue_mode(self):
+
+        # Default values
+        self.log_dir = os.path.join(sys_config.log_root, self.exp_config.log_dir_name, self.exp_config.experiment_name)
+        self.init_checkpoint_path = None
+        self.continue_run = False
+        self.init_step = 0
+
+        model_path = os.path.join(sys_config.project_root, 'models', 'validation_ckpt.pth')
+
+        if os.path.exists(model_path):
+            self.net.load_state_dict(torch.load(model_path))
+        else:
+            basic_logger.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Script for training")
     parser.add_argument("EXP_PATH", type=str, help="Path to experiment config file")
     parser.add_argument("LOCAL", type=str, help="Is this script run on the local machine or the BIWI cluster?")
     parser.add_argument("dummy", type=str, help="Is the module run with dummy training?")
-    parser.add_argument("BatchSize", type=int, help="batch size")
     args = parser.parse_args()
 
     config_file = args.EXP_PATH
@@ -424,7 +441,7 @@ if __name__ == '__main__':
     else:
         import config.system as sys_config
 
-    logging.info('Running experiment with script: {}'.format(config_file))
+   # basic_logger.info('Running experiment with script: {}'.format(config_file))
 
     exp_config = SourceFileLoader(config_module, config_file).load_module()
 
@@ -433,13 +450,17 @@ if __name__ == '__main__':
     utils.makefolder(log_dir)
 
     shutil.copy(exp_config.__file__, log_dir)
-    logging.info('!!!! Copied exp_config file to experiment folder !!!!')
 
-    logging.info('**************************************************************')
-    logging.info(' *** Running Experiment: %s', exp_config.experiment_name)
-    logging.info('**************************************************************')
+    basic_logger = utils.setup_logger('basic_logger', log_dir + '/training_log.log')
+    basic_logger.info('Running experiment with script: {}'.format(config_file))
 
-    model = UNetModel(exp_config, batch_size=args.BatchSize)
+    basic_logger.info('!!!! Copied exp_config file to experiment folder !!!!')
+
+    basic_logger.info('**************************************************************')
+    basic_logger.info(' *** Running Experiment: %s', exp_config.experiment_name)
+    basic_logger.info('**************************************************************')
+
+    model = UNetModel(exp_config)
     transform = None
 
     #data = lidc_data(sys_config=sys_config, exp_config=exp_config)

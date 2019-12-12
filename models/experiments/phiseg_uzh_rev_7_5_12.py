@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
 from models.phiseg import PHISeg
+from data.uzh_data import uzh_data
 from utils import normalise_image
-from data.lidc_data import lidc_data
-experiment_name = 'PHISegReversible'
-log_dir_name = 'lidc'
-
-data_loader = lidc_data
+experiment_name = 'PHISegRev_7_5_12'
+log_dir_name = 'uzh'
+data_loader = uzh_data
 
 # number of filter for the latent levels, they will be applied in the order as loaded into the list
 filter_channels = [32, 64, 128, 192, 192, 192, 192]
@@ -15,7 +14,7 @@ latent_levels = 5
 iterations = 5000000
 
 n_classes = 2
-num_labels_per_subject = 4
+num_labels_per_subject = 1
 
 no_convs_fcomb = 4 # not used
 beta = 10.0 # not used
@@ -27,7 +26,8 @@ exponential_weighting = True
 input_channels = 1
 epochs_to_train = 20
 batch_size = 12
-image_size = (1, 128, 128)
+image_size = (1, 192, 192)
+resize_to = [192, 192]
 
 augmentation_options = {'do_flip_lr': True,
                         'do_flip_ud': True,

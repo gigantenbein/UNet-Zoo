@@ -55,7 +55,7 @@ def dummy_train():
 
     def train(self, train_loader, validation_loader):
         self.net.train()
-        logging.info('Starting training.')
+        basic_logger.info('Starting training.')
 
         for self.epoch in range(self.epochs):
             self.validate(validation_loader)
@@ -86,8 +86,8 @@ def dummy_train():
 
                 print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                 if self.step % exp_config.logging_frequency == 0:
-                    logging.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
-                    logging.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
+                    basic_logger.info('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
+                    basic_logger.info('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
                     print('Epoch {} Step {} Loss {}'.format(self.epoch, self.step, self.loss))
                     print('Epoch: {} Number of processed patches: {}'.format(self.epoch, self.step))
                     self._create_tensorboard_summary()
@@ -112,14 +112,14 @@ def dummy_train():
             self.reconstruction_loss_list = []
             self.kl_loss_list = []
 
-            logging.info('Finished epoch {}'.format(self.epoch))
+            basic_logger.info('Finished epoch {}'.format(self.epoch))
             print('Finished epoch {}'.format(self.epoch))
-        logging.info('Finished training.')
+        basic_logger.info('Finished training.')
 
 def validate(self, validation_loader):
     self.net.eval()
     with torch.no_grad():
-        logging.info('Validation for step {}'.format(self.iteration))
+        basic_logger.info('Validation for step {}'.format(self.iteration))
 
         ged_list = []
         dice_list = []
@@ -205,12 +205,12 @@ def validate(self, validation_loader):
         self.avg_ged = torch.mean(ged_tensor)
         self.avg_ncc = torch.mean(ncc_tensor)
 
-        logging.info(' - Mean dice: %.4f' % torch.mean(per_structure_dice))
-        logging.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
-        logging.info(' - Mean GED: %.4f' % self.avg_ged)
-        logging.info(' - Mean NCC: %.4f' % self.avg_ncc)
+        basic_logger.info(' - Mean dice: %.4f' % torch.mean(per_structure_dice))
+        basic_logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+        basic_logger.info(' - Mean GED: %.4f' % self.avg_ged)
+        basic_logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
 
-        logging.info('Validation took {} seconds'.format(time.time() - time_))
+        basic_logger.info('Validation took {} seconds'.format(time.time() - time_))
 
     self.net.train()
 
@@ -267,7 +267,7 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
             patch.to(device)
             mask.to(device)
             if ii % 10 == 0:
-                logging.info("Progress: %d" % ii)
+                basic_logger.info("Progress: %d" % ii)
                 print("Progress: {} GED: {}".format(ii, ged))
 
             net.forward(patch, mask=mask, training=False)
@@ -304,17 +304,17 @@ def test_quantitative(model_path, exp_config, sys_config, do_plots=False):
     print(np.mean(dice_arr))
     print(np.std(dice_arr))
 
-    logging.info('-- GED: --')
-    logging.info(np.mean(ged_arr))
-    logging.info(np.std(ged_arr))
+    basic_logger.info('-- GED: --')
+    basic_logger.info(np.mean(ged_arr))
+    basic_logger.info(np.std(ged_arr))
 
-    logging.info('-- NCC: --')
-    logging.info(np.mean(ncc_arr))
-    logging.info(np.std(ncc_arr))
+    basic_logger.info('-- NCC: --')
+    basic_logger.info(np.mean(ncc_arr))
+    basic_logger.info(np.std(ncc_arr))
 
-    logging.info('-- Dice: --')
-    logging.info(np.mean(dice_arr))
-    logging.info(np.std(dice_arr))
+    basic_logger.info('-- Dice: --')
+    basic_logger.info(np.mean(dice_arr))
+    basic_logger.info(np.std(dice_arr))
 
    # np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_arr)
    # np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_arr)
@@ -350,7 +350,7 @@ def test_segmentation(exp_config, sys_config, amount_of_tests=1000):
             if ii > amount_of_tests:
                 break
             if ii % 10 == 0:
-                logging.info("Progress: %d" % ii)
+                basic_logger.info("Progress: %d" % ii)
                 print("Progress: {}".format(ii))
 
             net.forward(patch, mask, training=False)
