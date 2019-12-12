@@ -32,11 +32,13 @@ if __name__ == '__main__':
     else:
         import config.system as sys_config
 
-    basic_logger.info('Running experiment with script: {}'.format(config_file))
-
     exp_config = SourceFileLoader(config_module, config_file).load_module()
 
     log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
+
+    basic_logger = utils.setup_logger('basic_logger', log_dir + '/training_log.log')
+
+    basic_logger.info('Running experiment with script: {}'.format(config_file))
 
     utils.makefolder(log_dir)
 
