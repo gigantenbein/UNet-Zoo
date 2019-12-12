@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 
 import utils
 
-logging.basicConfig(level=basic_logger.info, format='%(asctime)s %(message)s')
+logging.basicConfig(level=logging.info, format='%(asctime)s %(message)s')
 
 def crop_or_pad_slice_to_size(slice, nx, ny):
     x, y = slice.shape
