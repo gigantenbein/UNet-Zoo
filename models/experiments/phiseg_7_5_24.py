@@ -4,7 +4,7 @@ from models.phiseg import PHISeg
 from data.lidc_data import lidc_data
 from utils import normalise_image
 
-experiment_name = 'PHISeg_7_5_12'
+experiment_name = 'PHISeg_7_5_24'
 log_dir_name = 'lidc'
 
 data_loader=lidc_data

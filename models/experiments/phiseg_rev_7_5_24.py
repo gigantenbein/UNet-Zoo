@@ -3,7 +3,7 @@ import torch.nn as nn
 from models.phiseg import PHISeg
 from utils import normalise_image
 from data.lidc_data import lidc_data
-experiment_name = 'PHISegRev_7_5_12'
+experiment_name = 'PHISegRev_7_5_24'
 log_dir_name = 'lidc'
 
 data_loader = lidc_data
