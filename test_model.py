@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
 
-    basic_logger = utils.setup_logger('basic_logger', log_dir + '/training_log.log')
+    basic_logger = utils.setup_logger('basic_logger', log_dir + '/test_log.log')
 
     basic_logger.info('Running experiment with script: {}'.format(config_file))
 
