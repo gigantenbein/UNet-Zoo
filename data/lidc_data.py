@@ -5,9 +5,10 @@ import numpy as np
 from data import lidc_data_loader
 from data.batch_provider import BatchProvider
 
+
 class lidc_data():
 
-    def __init__(self, sys_config,exp_config):
+    def __init__(self, sys_config, exp_config):
 
         data = lidc_data_loader.load_and_maybe_process_data(
             input_file=sys_config.data_root,
@@ -50,3 +51,25 @@ class lidc_data():
 
         self.validation.images = data['val']['images']
         self.validation.labels = data['val']['labels']
+
+
+if __name__ == '__main__':
+    from models.experiments import phiseg_rev_7_5_12 as exp_config
+    from config import local_config as sys_config
+    lidc = lidc_data(sys_config=sys_config, exp_config=exp_config)
+
+    print("Shape of test images LIDC: {}".format(lidc.test.images.shape))
+    print("Shape of test labels LIDC: {}".format(lidc.test.labels.shape))
+
+    print("Shape of validation images LIDC: {}".format(lidc.validation.images.shape))
+    print("Shape of validation labels LIDC: {}".format(lidc.validation.labels.shape))
+
+    from data import uzh_data
+    uzh = uzh_data.uzh_data(sys_config=sys_config, exp_config=exp_config)
+    print("Shape of test images uzh: {}".format(uzh.test.images.shape))
+    print("Shape of test labels uzh: {}".format(uzh.test.labels.shape))
+
+    print("Shape of validation images uzh: {}".format(uzh.validation.images.shape))
+    print("Shape of validation labels uzh: {}".format(uzh.validation.labels.shape))
+
+    print('hello')

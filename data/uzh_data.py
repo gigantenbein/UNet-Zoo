@@ -18,6 +18,9 @@ class uzh_data():
         else:
             resize_to = None
 
+        if not hasattr(exp_config, 'annotator_range'):
+            exp_config.annotator_range = range(exp_config.num_labels_per_subject)
+
         indices = list(range(data['X'].shape[0]))
         annotator_range = range(1)
         self.train = BatchProvider(data['X'][:-100], data['y'][:-100], indices[:-100],

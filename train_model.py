@@ -26,7 +26,7 @@ class UNetModel:
         Args:
             exp_config: Experiment configuration file as given in the experiment folder
     '''
-    def __init__(self, exp_config):
+    def __init__(self, exp_config, logger=None):
 
         self.net = exp_config.model(input_channels=exp_config.input_channels,
                                     num_classes=exp_config.n_classes,
@@ -39,6 +39,7 @@ class UNetModel:
                                     )
         self.exp_config = exp_config
         self.batch_size = exp_config.batch_size
+        self.logger = logger
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
@@ -47,14 +48,14 @@ class UNetModel:
             self.optimizer, 'min', min_lr=1e-4, verbose=True, patience=50000)
 
         if exp_config.pretrained_model is not None:
-            basic_logger.info('Loading pretrained model {}'.format(exp_config.pretrained_model))
+            self.logger.info('Loading pretrained model {}'.format(exp_config.pretrained_model))
 
             model_path = os.path.join(sys_config.project_root, 'models', exp_config.pretrained_model)
 
             if os.path.exists(model_path):
                 self.net.load_state_dict(torch.load(model_path))
             else:
-                basic_logger.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
+                self.logger.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
 
         self.mean_loss_of_epoch = 0
         self.tot_loss = 0
@@ -82,9 +83,9 @@ class UNetModel:
 
     def train(self, data):
         self.net.train()
-        basic_logger.info('Starting training.')
-        basic_logger.info('Current filters: {}'.format(self.exp_config.filter_channels))
-        basic_logger.info('Batch size: {}'.format(self.batch_size))
+        self.logger.info('Starting training.')
+        self.logger.info('Current filters: {}'.format(self.exp_config.filter_channels))
+        self.logger.info('Batch size: {}'.format(self.batch_size))
 
         for self.iteration in range(1, self.exp_config.iterations):
             x_b, s_b = data.train.next_batch(self.batch_size)
@@ -113,7 +114,7 @@ class UNetModel:
                 self.validate(data)
 
             if self.iteration % self.exp_config.logging_frequency == 0:
-                basic_logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
+                self.logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
                 self._create_tensorboard_summary()
                 self.tot_loss = 0
                 self.kl_loss = 0
@@ -121,14 +122,14 @@ class UNetModel:
 
             self.scheduler.step(self.loss)
 
-        basic_logger.info('Finished training.')
+        self.logger.info('Finished training.')
 
     def validate(self, data):
         self.net.eval()
         with torch.no_grad():
-            basic_logger.info('Validation for step {}'.format(self.iteration))
+            self.logger.info('Validation for step {}'.format(self.iteration))
 
-            basic_logger.info('Checkpointing model.')
+            self.logger.info('Checkpointing model.')
             self.save_model('validation_ckpt')
 
             ged_list = []
@@ -232,29 +233,29 @@ class UNetModel:
             self.avg_ged = torch.mean(ged_tensor)
             self.avg_ncc = torch.mean(ncc_tensor)
 
-            basic_logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
-            basic_logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
-            basic_logger.info(' - Mean GED: %.4f' % self.avg_ged)
-            basic_logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
+            self.logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
+            self.logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+            self.logger.info(' - Mean GED: %.4f' % self.avg_ged)
+            self.logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
 
             if torch.mean(per_structure_dice) >= self.best_dice:
                 self.best_dice = torch.mean(per_structure_dice)
-                basic_logger.info('New best validation Dice! (%.3f)' % self.best_dice)
+                self.logger.info('New best validation Dice! (%.3f)' % self.best_dice)
                 self.save_model(savename='best_dice')
             if self.val_elbo <= self.best_loss:
                 self.best_loss = self.val_elbo
-                basic_logger.info('New best validation loss! (%.3f)' % self.best_loss)
+                self.logger.info('New best validation loss! (%.3f)' % self.best_loss)
                 self.save_model(savename='best_loss')
             if self.avg_ged <= self.best_ged:
                 self.best_ged = self.avg_ged
-                basic_logger.info('New best GED score! (%.3f)' % self.best_ged)
+                self.logger.info('New best GED score! (%.3f)' % self.best_ged)
                 self.save_model(savename='best_ged')
             if self.avg_ncc >= self.best_ncc:
                 self.best_ncc = self.avg_ncc
-                basic_logger.info('New best NCC score! (%.3f)' % self.best_ncc)
+                self.logger.info('New best NCC score! (%.3f)' % self.best_ncc)
                 self.save_model(savename='best_ncc')
 
-            basic_logger.info('Validation took {} seconds'.format(time.time()-time_))
+            self.logger.info('Validation took {} seconds'.format(time.time()-time_))
 
         self.net.train()
 
@@ -287,7 +288,7 @@ class UNetModel:
             if self.device == torch.device('cuda'):
                 allocated_memory = torch.cuda.max_memory_allocated(self.device)
 
-                basic_logger.info('Memory allocated in current iteration: {}{}'.format(allocated_memory, self.iteration))
+                self.logger.info('Memory allocated in current iteration: {}{}'.format(allocated_memory, self.iteration))
                 self.training_writer.add_scalar('Max_memory_allocated', allocated_memory, self.iteration)
 
         self.net.train()
@@ -297,16 +298,20 @@ class UNetModel:
         with torch.no_grad():
 
             model_selection = self.exp_config.experiment_name + '_best_ged.pth'
-            basic_logger.info('Testing {}'.format(model_selection))
+            self.logger.info('Testing {}'.format(model_selection))
 
-            basic_logger.info('Loading pretrained model {}'.format(model_selection))
+            self.logger.info('Loading pretrained model {}'.format(model_selection))
 
-            model_path = os.path.join(sys_config.project_root, 'models', model_selection)
+            model_path = os.path.join(
+                sys_config.log_root,
+                self.exp_config.log_dir_name,
+                self.exp_config.experiment_name,
+                model_selection)
 
             if os.path.exists(model_path):
                 self.net.load_state_dict(torch.load(model_path))
             else:
-                basic_logger.info('The file {} does not exist. Aborting test function.'.format(model_path))
+                self.logger.info('The file {} does not exist. Aborting test function.'.format(model_path))
                 return
 
             ged_list = []
@@ -392,13 +397,13 @@ class UNetModel:
             self.avg_ged = torch.mean(ged_tensor)
             self.avg_ncc = torch.mean(ncc_tensor)
 
-            basic_logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
-            basic_logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
-            basic_logger.info(' - Mean GED: %.4f' % self.avg_ged)
-            basic_logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
+            self.logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
+            self.logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+            self.logger.info(' - Mean GED: %.4f' % self.avg_ged)
+            self.logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
 
 
-            basic_logger.info('Testing took {} seconds'.format(time.time() - time_))
+            self.logger.info('Testing took {} seconds'.format(time.time() - time_))
 
     def save_model(self, savename):
         model_name = self.exp_config.experiment_name + '_' + savename + '.pth'
@@ -406,7 +411,7 @@ class UNetModel:
         log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
         save_model_path = os.path.join(log_dir, model_name)
         torch.save(self.net.state_dict(), save_model_path)
-        basic_logger.info('saved model to .pth file in {}'.format(save_model_path))
+        self.logger.info('saved model to .pth file in {}'.format(save_model_path))
 
     def _setup_log_dir_and_continue_mode(self):
 
@@ -421,7 +426,7 @@ class UNetModel:
         if os.path.exists(model_path):
             self.net.load_state_dict(torch.load(model_path))
         else:
-            basic_logger.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
+            self.logger.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
 
 
 if __name__ == '__main__':
@@ -441,8 +446,6 @@ if __name__ == '__main__':
     else:
         import config.system as sys_config
 
-   # basic_logger.info('Running experiment with script: {}'.format(config_file))
-
     exp_config = SourceFileLoader(config_module, config_file).load_module()
 
     log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
@@ -460,13 +463,11 @@ if __name__ == '__main__':
     basic_logger.info(' *** Running Experiment: %s', exp_config.experiment_name)
     basic_logger.info('**************************************************************')
 
-    model = UNetModel(exp_config)
+    model = UNetModel(exp_config, logger=basic_logger)
     transform = None
-
-    #data = lidc_data(sys_config=sys_config, exp_config=exp_config)
 
     # this loads either lidc or uzh data
     data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)
     model.train(data)
 
-    model.save_model()
+    model.save_model('last')

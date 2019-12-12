@@ -49,10 +49,9 @@ if __name__ == '__main__':
     basic_logger.info(' *** Running Experiment: %s', exp_config.experiment_name)
     basic_logger.info('**************************************************************')
 
-    model = UNetModel(exp_config)
+    model = UNetModel(exp_config, logger=basic_logger)
     transform = None
 
-    data = lidc_data(sys_config=sys_config, exp_config=exp_config)
+    data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)
     model.test(data, sys_config=sys_config)
 
-    #model.save_model()
