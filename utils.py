@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
 from medpy.metric import jc
+import logging
 
 import numpy as np
 import os
@@ -324,4 +325,17 @@ def convert_nchw_to_nhwc(tensor):
     result = tensor.transpose(1, 3).transpose(1, 2)
     assert torch.equal(tensor, convert_nhwc_to_nchw(result))
     return result
+
+def setup_logger(name, log_file, level=logging.INFO):
+    """To setup as many loggers as you want"""
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+
+    handler = logging.FileHandler(log_file)
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+
+    return logger
 

@@ -13,7 +13,7 @@ def resize_batch(imgs, target_size):
 
     sx = imgs.shape[1]
     sy = imgs.shape[2]
-    return zoom(imgs, (1,float(target_size[0])/sx,float(target_size[1]/sy),1), order=0)
+    return zoom(imgs, (1, float(target_size[0]) / sx, float(target_size[1] / sy)), order=0)
 
 class BatchProvider():
     """
@@ -102,17 +102,17 @@ class BatchProvider():
             X_batch = resize_batch(X_batch, self.resize_to)
             y_batch = resize_batch(y_batch, self.resize_to) if y_batch.ndim > 1 else y_batch
 
-        # logging.info('@@@ Shape start')
-        # logging.info(X_batch.shape)
-        # logging.info(y_batch.shape)
+        # basic_logger.info('@@@ Shape start')
+        # basic_logger.info(X_batch.shape)
+        # basic_logger.info(y_batch.shape)
 
 
         if self.do_augmentations:
             X_batch, y_batch = self._augmentation_function(X_batch, y_batch)
 
-        # logging.info('@@@ Shape after aug')
-        # logging.info(X_batch.shape)
-        # logging.info(y_batch.shape)
+        # basic_logger.info('@@@ Shape after aug')
+        # basic_logger.info(X_batch.shape)
+        # basic_logger.info(y_batch.shape)
 
         if self.normalise_images:
             utils.normalise_images(np.float32(X_batch))
