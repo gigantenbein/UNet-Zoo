@@ -13,4 +13,6 @@ data_root = '/Users/marcgantenbein/scratch/data/data_lidc.pickle'
 
 uzh_root = '/Users/marcgantenbein/scratch/data/prostate_original.mat'
 
+brats_root = '/Users/marcgantenbein/scratch/data/'
+
 preproc_folder = '/Users/marcgantenbein/scratch/data/preproc'

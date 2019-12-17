@@ -49,3 +49,35 @@ weight_decay = 10e-5
 pretrained_model = None #'PHISeg_best_ged.pth'
 # model
 model = PHISeg3D
+
+CHANNELS = [60, 120, 240, 360, 480]
+INITIAL_LR = 1e-4
+L2_REGULARIZER = 1e-5
+
+#logging settings
+LOG_EVERY_K_ITERATIONS = 5 #0 to disable logging
+LOG_MEMORY_EVERY_K_ITERATIONS = False
+LOG_MEMORY_EVERY_EPOCH = True
+LOG_EPOCH_TIME = True
+LOG_VALIDATION_TIME = True
+LOG_HAUSDORFF_EVERY_K_EPOCHS = 0 #must be a multiple of VALIDATE_EVERY_K_EPOCHS
+LOG_COMETML = False
+LOG_PARAMCOUNT = True
+LOG_LR_EVERY_EPOCH = True
+
+#data and augmentation
+TRAIN_ORIGINAL_CLASSES = False #train on original 5 classes
+DATASET_WORKERS = 1
+SOFT_AUGMENTATION = False #Soft augmetation directly works on the 3 classes. Hard augmentation augments on the 5 orignal labels, then takes the argmax
+NN_AUGMENTATION = True #Has priority over soft/hard augmentation. Uses nearest-neighbor interpolation
+DO_ROTATE = True
+DO_SCALE = True
+DO_FLIP = True
+DO_ELASTIC_AUG = True
+DO_INTENSITY_SHIFT = True
+#RANDOM_CROP = [128, 128, 128]
+
+ROT_DEGREES = 20
+SCALE_FACTOR = 1.1
+SIGMA = 10
+MAX_INTENSITY_SHIFT = 0.1

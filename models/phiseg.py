@@ -561,7 +561,7 @@ class PHISeg(nn.Module):
         recon_flat = reconstruction.view(batch_size, self.num_classes, -1)
         target_flat = target.view(batch_size, -1).long()
         return torch.mean(
-            torch.sum(criterion(target=target_flat, input=recon_flat), axis=1)
+            torch.sum(criterion(target=target_flat, input=recon_flat), dim=1)
         )
 
     def residual_multinoulli_loss(self, reconstruction, target):

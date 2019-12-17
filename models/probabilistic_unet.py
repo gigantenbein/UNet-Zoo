@@ -198,9 +198,16 @@ class ProbabilisticUnet(nn.Module):
     no_cons_per_block: no convs per block in the (convolutional) encoder of prior and posterior
     """
 
-    def __init__(self, input_channels=1, num_classes=1, num_filters=[32, 64, 128, 192], latent_dim=6, initializers=None,
-                 no_convs_fcomb=4,
-                 beta=10.0, reversible=False):
+    def __init__(self, input_channels=1,
+                 num_classes=1,
+                 num_filters=None,
+                 latent_levels=1,
+                 latent_dim=6,
+                 initializers=None,
+                 no_convs_fcomb=3,
+                 image_size=(1, 128, 128),
+                 beta=10.0,
+                 reversible=False):
         super(ProbabilisticUnet, self).__init__()
         self.input_channels = input_channels
         self.num_classes = num_classes
@@ -209,7 +216,6 @@ class ProbabilisticUnet(nn.Module):
         self.no_convs_per_block = 3
         self.no_convs_fcomb = no_convs_fcomb
         self.initializers = {'w': 'he_normal', 'b': 'normal'}
-        self.beta = beta
         self.z_prior_sample = 0
 
         self.unet = Unet(self.input_channels, self.num_classes, self.num_filters, self.initializers,
@@ -217,9 +223,13 @@ class ProbabilisticUnet(nn.Module):
         self.prior = AxisAlignedConvGaussian(self.input_channels, self.num_filters, self.no_convs_per_block,
                                              self.latent_dim, self.initializers, ).to(device)
         self.posterior = AxisAlignedConvGaussian(self.input_channels, self.num_filters, self.no_convs_per_block,
-                                                 self.latent_dim, self.initializers, posterior=True).to(device)
+                                                  self.latent_dim, self.initializers, posterior=True).to(device)
         self.fcomb = Fcomb(self.num_filters, self.latent_dim, self.input_channels, self.num_classes,
                            self.no_convs_fcomb, {'w': 'orthogonal', 'b': 'normal'}, use_tile=True).to(device)
+
+        # self.fcomb = Fcomb(self.num_filters, self.latent_dim, self.input_channels, self.num_classes,
+        #                   self.no_convs_fcomb, self.initializers, use_tile=True).to(device)
+        self.last_conv = nn.Conv2d(32, num_classes, kernel_size=1)
 
     def forward(self, patch, segm=None, training=True):
         """
@@ -230,7 +240,7 @@ class ProbabilisticUnet(nn.Module):
             self.posterior_latent_space = self.posterior.forward(patch, segm)
         self.prior_latent_space = self.prior.forward(patch)
         self.unet_features = self.unet.forward(patch, False)
-        return self.unet_features # added for summary writer
+        return self.last_conv(self.unet_features) # added for summary writer
 
     def sample(self, testing=False):
         """
@@ -260,6 +270,13 @@ class ProbabilisticUnet(nn.Module):
                 z_posterior = self.posterior_latent_space.rsample()
         return self.fcomb.forward(self.unet_features, z_posterior)
 
+    def accumulate_output(self, output_list, use_softmax=False):
+        """Adapted to ProbUnet, which does not have an output list"""
+        s_accum = output_list
+        if use_softmax:
+            return torch.nn.functional.softmax(s_accum, dim=1)
+        return s_accum
+
     def kl_divergence(self, analytic=True, calculate_posterior=False, z_posterior=None):
         """
         Calculate the KL divergence between the posterior and prior KL(Q||P)
@@ -285,11 +302,10 @@ class ProbabilisticUnet(nn.Module):
         recon_flat = reconstruction.view(batch_size, self.num_classes, -1)
         target_flat = target.view(batch_size, -1).long()
         return torch.mean(
-            torch.sum(criterion(target=target_flat, input=recon_flat), axis=1)
+            torch.sum(criterion(target=target_flat, input=recon_flat), dim=1)
         )
 
-
-    def elbo(self, segm, analytic_kl=True, reconstruct_posterior_mean=False):
+    def elbo(self, segm, analytic_kl=False, reconstruct_posterior_mean=False):
         """
         Calculate the evidence lower bound of the log-likelihood of P(Y|X)
         """

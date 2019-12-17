@@ -4,7 +4,7 @@
 # Adopted from: https://git.ee.ethz.ch/baumgach/discriminative_learning_toolbox/blob/master/utils.py
 import cv2
 import numpy as np
-import dataProcessing.utils as utils
+import data.BratsProcessing.utils as utils
 from matplotlib import pyplot as plt
 import time
 

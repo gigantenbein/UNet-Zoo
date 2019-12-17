@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter, FileWriter
+from torch import autograd
 
 # Python bundle packages
 import os
@@ -14,6 +15,7 @@ import math
 
 # own files
 import utils
+import data.bratsDataset as bratsDataset
 
 # catch all the warnings with the debugger
 # import warnings
@@ -32,6 +34,7 @@ class UNetModel:
                                     num_classes=exp_config.n_classes,
                                     num_filters=exp_config.filter_channels,
                                     latent_levels=exp_config.latent_levels,
+                                    latent_dim=exp_config.latent_dim,
                                     no_convs_fcomb=exp_config.no_convs_fcomb,
                                     beta=exp_config.beta,
                                     image_size=exp_config.image_size,
@@ -43,7 +46,7 @@ class UNetModel:
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.to(self.device)
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3, weight_decay=0)
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3, weight_decay=1e-5)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer, 'min', min_lr=1e-4, verbose=True, patience=50000)
 
@@ -88,39 +91,42 @@ class UNetModel:
         self.logger.info('Batch size: {}'.format(self.batch_size))
 
         for self.iteration in range(1, self.exp_config.iterations):
-            x_b, s_b = data.train.next_batch(self.batch_size)
+            with autograd.detect_anomaly():
+                x_b, s_b = data.train.next_batch(self.batch_size)
 
-            patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
+                patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
 
-            mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
-            mask = torch.unsqueeze(mask, 1)
+                mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
+                mask = torch.unsqueeze(mask, 1)
 
-            self.mask = mask
-            self.patch = patch
+                self.mask = mask
+                self.patch = patch
 
-            self.net.forward(patch, mask, training=True)
-            self.loss = self.net.loss(mask)
+                self.net.forward(patch, mask, training=True)
+                self.loss = self.net.loss(mask)
 
-            self.tot_loss += self.loss
+                self.tot_loss += self.loss
 
-            self.reconstruction_loss += self.net.reconstruction_loss
-            self.kl_loss += self.net.kl_divergence_loss
-
-            self.optimizer.zero_grad()
-            self.loss.backward()
-            self.optimizer.step()
-
-            if self.iteration % self.exp_config.validation_frequency == 0:
-                self.validate(data)
-
-            if self.iteration % self.exp_config.logging_frequency == 0:
+                self.reconstruction_loss += self.net.reconstruction_loss
+                self.kl_loss += self.net.kl_divergence_loss
                 self.logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
-                self._create_tensorboard_summary()
-                self.tot_loss = 0
-                self.kl_loss = 0
-                self.reconstruction_loss = 0
 
-            self.scheduler.step(self.loss)
+                self.optimizer.zero_grad()
+
+                self.loss.backward()
+                self.optimizer.step()
+
+                if self.iteration % self.exp_config.validation_frequency == 0:
+                    self.validate(data)
+
+                if self.iteration % self.exp_config.logging_frequency == 0:
+                    self.logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
+                    self._create_tensorboard_summary()
+                    self.tot_loss = 0
+                    self.kl_loss = 0
+                    self.reconstruction_loss = 0
+
+                self.scheduler.step(self.loss)
 
         self.logger.info('Finished training.')
 
@@ -258,6 +264,29 @@ class UNetModel:
             self.logger.info('Validation took {} seconds'.format(time.time()-time_))
 
         self.net.train()
+
+    def train_brats(self, train_loader):
+        while epoch < 100:
+
+            # set net up training
+            self.net.train()
+
+            for i, data in enumerate(self.trainDataLoader):
+
+                # load data
+                inputs, pid, labels = data
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+
+                # forward and backward pass
+                outputs = self.net.forward(inputs, labels)
+                loss = self.loss(outputs, labels)
+                del inputs, outputs, labels
+                loss.backward()
+
+            epoch = epoch + 1
+
+        # print best mean dice
+        print("Best mean dice: {:.4f} at epoch {}".format(self.bestMeanDice, self.bestMeanDiceEpoch))
 
     def _create_tensorboard_summary(self, end_of_epoch=False):
         self.net.eval()
@@ -413,21 +442,6 @@ class UNetModel:
         torch.save(self.net.state_dict(), save_model_path)
         self.logger.info('saved model to .pth file in {}'.format(save_model_path))
 
-    def _setup_log_dir_and_continue_mode(self):
-
-        # Default values
-        self.log_dir = os.path.join(sys_config.log_root, self.exp_config.log_dir_name, self.exp_config.experiment_name)
-        self.init_checkpoint_path = None
-        self.continue_run = False
-        self.init_step = 0
-
-        model_path = os.path.join(sys_config.project_root, 'models', 'validation_ckpt.pth')
-
-        if os.path.exists(model_path):
-            self.net.load_state_dict(torch.load(model_path))
-        else:
-            self.logger.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Script for training")
@@ -465,6 +479,12 @@ if __name__ == '__main__':
 
     model = UNetModel(exp_config, logger=basic_logger)
     transform = None
+
+    # trainset = bratsDataset.BratsDataset(sys_config.brats_root, exp_config, mode="train", randomCrop=None)
+    # trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, pin_memory=True,
+    #                                           num_workers=1)
+    #
+    # model.train_brats(trainloader)
 
     # this loads either lidc or uzh data
     data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)
