@@ -10,24 +10,24 @@ log_dir_name = 'lidc'
 data_loader=lidc_data
 
 # number of filter for the latent levels, they will be applied in the order as loaded into the list
-filter_channels = [32, 64, 128, 192, 192, 192, 192]
-latent_levels = 5
+filter_channels = [32, 64, 128]
+latent_levels = 2
 
 iterations = 5000000
 
-n_classes = 2
+n_classes = 3
 num_labels_per_subject = 4
 
 no_convs_fcomb = 4 # not used
 beta = 10.0 # not used
 #
-use_reversible = False
+use_reversible = True
 exponential_weighting = True
 
 # use 1 for grayscale, 3 for RGB images
-input_channels = 1
+input_channels = 4
 epochs_to_train = 20
-batch_size = 12
+batch_size = 1
 image_size = 0
 
 augmentation_options = {'do_flip_lr': True,

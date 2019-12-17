@@ -274,8 +274,8 @@ def load_and_maybe_process_data(input_folder,
 
 
 if __name__ == '__main__':
-    input_folder = "path/to/original/training"
-    preprocessing_folder = "path/to/desired/output/location"
+    input_folder = "/Users/marcgantenbein/scratch/data/MICCAI_BraTS_2018_Data_Training/HGG"
+    preprocessing_folder = "/Users/marcgantenbein/scratch/data/MICCAI_BraTS_2018_Data_Training_preproc/"
 
     d = load_and_maybe_process_data(input_folder, preprocessing_folder, 4, force_overwrite=True)
 

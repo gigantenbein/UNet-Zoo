@@ -34,7 +34,6 @@ class UNetModel:
                                     num_classes=exp_config.n_classes,
                                     num_filters=exp_config.filter_channels,
                                     latent_levels=exp_config.latent_levels,
-                                    latent_dim=exp_config.latent_dim,
                                     no_convs_fcomb=exp_config.no_convs_fcomb,
                                     beta=exp_config.beta,
                                     image_size=exp_config.image_size,
@@ -265,13 +264,14 @@ class UNetModel:
 
         self.net.train()
 
-    def train_brats(self, train_loader):
+    def train_brats(self, trainDataLoader):
+        epoch = 1
         while epoch < 100:
 
             # set net up training
             self.net.train()
 
-            for i, data in enumerate(self.trainDataLoader):
+            for i, data in enumerate(trainDataLoader):
 
                 # load data
                 inputs, pid, labels = data
@@ -280,13 +280,11 @@ class UNetModel:
                 # forward and backward pass
                 outputs = self.net.forward(inputs, labels)
                 loss = self.loss(outputs, labels)
+                print('Current loss at iteration {} : {}'.format(i, loss))
                 del inputs, outputs, labels
                 loss.backward()
 
             epoch = epoch + 1
-
-        # print best mean dice
-        print("Best mean dice: {:.4f} at epoch {}".format(self.bestMeanDice, self.bestMeanDiceEpoch))
 
     def _create_tensorboard_summary(self, end_of_epoch=False):
         self.net.eval()
@@ -480,11 +478,11 @@ if __name__ == '__main__':
     model = UNetModel(exp_config, logger=basic_logger)
     transform = None
 
-    # trainset = bratsDataset.BratsDataset(sys_config.brats_root, exp_config, mode="train", randomCrop=None)
-    # trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, pin_memory=True,
-    #                                           num_workers=1)
-    #
-    # model.train_brats(trainloader)
+    trainset = bratsDataset.BratsDataset(sys_config.brats_root, exp_config, mode="train", randomCrop=None)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, pin_memory=True,
+                                              num_workers=1)
+
+    model.train_brats(trainloader)
 
     # this loads either lidc or uzh data
     data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)

@@ -202,9 +202,9 @@ class ProbabilisticUnet(nn.Module):
                  num_classes=1,
                  num_filters=None,
                  latent_levels=1,
-                 latent_dim=6,
+                 latent_dim=2,
                  initializers=None,
-                 no_convs_fcomb=3,
+                 no_convs_fcomb=4,
                  image_size=(1, 128, 128),
                  beta=10.0,
                  reversible=False):
@@ -302,20 +302,20 @@ class ProbabilisticUnet(nn.Module):
         analytic: calculate KL analytically or via sampling from the posterior
         calculate_posterior: if we use samapling to approximate KL we can sample here or supply a sample
         """
-        # if analytic:
-        #     # Neeed to add this to torch source code, see: https://github.com/pytorch/pytorch/issues/13545
-        #     kl_div = kl.kl_divergence(self.posterior_latent_space, self.prior_latent_space)
-        # else:
-        #     if calculate_posterior:
-        #         z_posterior = self.posterior_latent_space.rsample()
-        #     log_posterior_prob = self.posterior_latent_space.log_prob(z_posterior)
-        #     log_prior_prob = self.prior_latent_space.log_prob(z_posterior)
-        #     kl_div = log_posterior_prob - log_prior_prob
-        mu0 = self.posterior_latent_space.mean
-        sigma0 = self.posterior_latent_space.stddev
-        mu1 = self.prior_latent_space.mean
-        sigma1 = self.prior_latent_space.stddev
-        kl_div = self.KL_two_gauss_with_diag_cov(mu0, sigma0, mu1, sigma1)
+        if analytic:
+            # Neeed to add this to torch source code, see: https://github.com/pytorch/pytorch/issues/13545
+            kl_div = kl.kl_divergence(self.posterior_latent_space, self.prior_latent_space)
+        else:
+            if calculate_posterior:
+                z_posterior = self.posterior_latent_space.rsample()
+            log_posterior_prob = self.posterior_latent_space.log_prob(z_posterior)
+            log_prior_prob = self.prior_latent_space.log_prob(z_posterior)
+            kl_div = log_posterior_prob - log_prior_prob
+        # mu0 = self.posterior_latent_space.mean
+        # sigma0 = self.posterior_latent_space.stddev
+        # mu1 = self.prior_latent_space.mean
+        # sigma1 = self.prior_latent_space.stddev
+        # kl_div = self.KL_two_gauss_with_diag_cov(mu0, sigma0, mu1, sigma1)
         return kl_div
 
     def multinoulli_loss(self, reconstruction, target):

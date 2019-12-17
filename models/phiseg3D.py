@@ -140,7 +140,7 @@ class UpConvolutionalBlock(nn.Module):
 
     def forward(self, x, bridge):
         if self.bilinear:
-            x = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=True)
+            x = nn.Upsample(x, mode='bilinear', scale_factor=2, align_corners=True)
             x = self.upconv_layer(x)
 
         assert x.shape[3] == bridge.shape[3]
@@ -197,6 +197,7 @@ class Posterior(nn.Module):
                  input_channels,
                  num_classes,
                  num_filters,
+                 latent_levels,
                  initializers=None,
                  padding=True,
                  is_posterior=True,
@@ -205,8 +206,8 @@ class Posterior(nn.Module):
         self.input_channels = input_channels
         self.num_filters = num_filters
 
-        self.latent_levels = 5
-        self.resolution_levels = 7
+        self.latent_levels = latent_levels
+        self.resolution_levels = len(num_filters)
         self.lvl_diff = self.resolution_levels - self.latent_levels
 
         self.padding = padding
@@ -214,7 +215,7 @@ class Posterior(nn.Module):
 
         if is_posterior:
             # increase input channel by two to accomodate place for mask in one hot encoding
-            self.input_channels += 2
+            self.input_channels += num_classes
 
         self.contracting_path = nn.ModuleList()
 
@@ -305,7 +306,6 @@ class Likelihood(nn.Module):
                  num_classes,
                  num_filters,
                  latent_levels=5,
-                 resolution_levels=7,
                  image_size=(128,128,1),
                  reversible=False,
                  initializers=None,
@@ -318,8 +318,8 @@ class Likelihood(nn.Module):
         self.num_filters = num_filters
 
         self.latent_levels = latent_levels
-        self.resolution_levels = resolution_levels
-        self.lvl_diff = resolution_levels - latent_levels
+        self.resolution_levels = len(num_filters)
+        self.lvl_diff = self.resolution_levels - latent_levels
 
         self.image_size = image_size
         self.reversible= reversible
@@ -379,7 +379,7 @@ class Likelihood(nn.Module):
         post_c[self.latent_levels - 1] = post_z[self.latent_levels - 1]
 
         for i in reversed(range(self.latent_levels - 1)):
-            ups_below = nn.functional.interpolate(
+            ups_below = nn.Upsample(
                 post_c[i+1],
                 mode='bilinear',
                 scale_factor=2,
@@ -395,7 +395,7 @@ class Likelihood(nn.Module):
 
         for i, block in enumerate(self.s_layer):
             s_in = block(post_c[-i-1]) # no activation in the last layer
-            s[-i-1] = torch.nn.functional.interpolate(s_in, size=[self.image_size[1], self.image_size[2]], mode='nearest')
+            s[-i-1] = torch.nn.Upsample(s_in, size=[self.image_size[1], self.image_size[2]], mode='nearest')
 
         return s
 
@@ -448,12 +448,12 @@ class PHISeg3D(nn.Module):
         self.kl_divergence_loss = 0
         self.reconstruction_loss = 0
 
-        self.posterior = Posterior(input_channels, num_classes, num_filters,
+        self.posterior = Posterior(input_channels, num_classes, num_filters, latent_levels=latent_levels,
                                    initializers=None, padding=True, reversible=reversible)
-        self.likelihood = Likelihood(input_channels, num_classes, num_filters,
+        self.likelihood = Likelihood(input_channels, num_classes, num_filters,latent_levels=latent_levels,
                                      initializers=None, apply_last_layer=True, padding=True, image_size=self.image_size,
                                      reversible=reversible)
-        self.prior = Posterior(input_channels, num_classes, num_filters,
+        self.prior = Posterior(input_channels, num_classes, num_filters, latent_levels=latent_levels,
                                initializers=None, padding=True, is_posterior=False, reversible=reversible)
 
         self.s_out_list = [None] * self.latent_levels

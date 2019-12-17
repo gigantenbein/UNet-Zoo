@@ -287,17 +287,24 @@ def convert_to_onehot(lblmap, nlabels):
 # needs a torch tensor as input instead of numpy array
 # accepts format HW and CHW
 def convert_to_onehot_torch(lblmap, nlabels):
-    output = torch.zeros((nlabels, lblmap.shape[-2], lblmap.shape[-1]))
-    for ii in range(nlabels):
-        lbl = (lblmap == ii).view(lblmap.shape[-2], lblmap.shape[-1])
-        output[ii, :, :] = lbl
+    if len(lblmap.shape) == 3:
+        # 2D image
+        output = torch.zeros((nlabels, lblmap.shape[-2], lblmap.shape[-1]))
+        for ii in range(nlabels):
+            lbl = (lblmap == ii).view(lblmap.shape[-2], lblmap.shape[-1])
+            output[ii, :, :] = lbl
+    elif len(lblmap.shape) == 4:
+        # 3D images from brats are already one hot encoded
+        output = lblmap
     return output.long()
+
 
 
 def convert_batch_to_onehot(lblbatch, nlabels):
     out = []
     for ii in range(lblbatch.shape[0]):
-        lbl = convert_to_onehot_torch(lblbatch[ii,...], nlabels) # TODO: check change
+        lbl = convert_to_onehot_torch(lblbatch[ii,...], nlabels)
+        # TODO: check change
         out.append(lbl.unsqueeze(dim=0))
 
     result = torch.cat(out, dim=0)

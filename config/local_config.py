@@ -13,6 +13,6 @@ data_root = '/Users/marcgantenbein/scratch/data/data_lidc.pickle'
 
 uzh_root = '/Users/marcgantenbein/scratch/data/prostate_original.mat'
 
-brats_root = '/Users/marcgantenbein/scratch/data/'
+brats_root = '/Users/marcgantenbein/scratch/data/MICCAI_BraTS_2018_Data_Training_preproc/data_3D_size_160_192_160_res_1.0_1.0_1.0.hdf5'
 
 preproc_folder = '/Users/marcgantenbein/scratch/data/preproc'
