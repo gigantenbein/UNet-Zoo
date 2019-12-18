@@ -90,42 +90,40 @@ class UNetModel:
         self.logger.info('Batch size: {}'.format(self.batch_size))
 
         for self.iteration in range(1, self.exp_config.iterations):
-            with autograd.detect_anomaly():
-                x_b, s_b = data.train.next_batch(self.batch_size)
+            x_b, s_b = data.train.next_batch(self.batch_size)
 
-                patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
+            patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
 
-                mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
-                mask = torch.unsqueeze(mask, 1)
+            mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
+            mask = torch.unsqueeze(mask, 1)
 
-                self.mask = mask
-                self.patch = patch
+            self.mask = mask
+            self.patch = patch
 
-                self.net.forward(patch, mask, training=True)
-                self.loss = self.net.loss(mask)
+            self.net.forward(patch, mask, training=True)
+            self.loss = self.net.loss(mask)
 
-                self.tot_loss += self.loss
+            self.tot_loss += self.loss
 
-                self.reconstruction_loss += self.net.reconstruction_loss
-                self.kl_loss += self.net.kl_divergence_loss
+            self.reconstruction_loss += self.net.reconstruction_loss
+            self.kl_loss += self.net.kl_divergence_loss
+
+            self.optimizer.zero_grad()
+
+            self.loss.backward()
+            self.optimizer.step()
+
+            if self.iteration % self.exp_config.validation_frequency == 0:
+                self.validate(data)
+
+            if self.iteration % self.exp_config.logging_frequency == 0:
                 self.logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
+                self._create_tensorboard_summary()
+                self.tot_loss = 0
+                self.kl_loss = 0
+                self.reconstruction_loss = 0
 
-                self.optimizer.zero_grad()
-
-                self.loss.backward()
-                self.optimizer.step()
-
-                if self.iteration % self.exp_config.validation_frequency == 0:
-                    self.validate(data)
-
-                if self.iteration % self.exp_config.logging_frequency == 0:
-                    self.logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
-                    self._create_tensorboard_summary()
-                    self.tot_loss = 0
-                    self.kl_loss = 0
-                    self.reconstruction_loss = 0
-
-                self.scheduler.step(self.loss)
+            self.scheduler.step(self.loss)
 
         self.logger.info('Finished training.')
 
@@ -478,11 +476,11 @@ if __name__ == '__main__':
     model = UNetModel(exp_config, logger=basic_logger)
     transform = None
 
-    trainset = bratsDataset.BratsDataset(sys_config.brats_root, exp_config, mode="train", randomCrop=None)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, pin_memory=True,
-                                              num_workers=1)
-
-    model.train_brats(trainloader)
+    # trainset = bratsDataset.BratsDataset(sys_config.brats_root, exp_config, mode="train", randomCrop=None)
+    # trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, pin_memory=True,
+    #                                           num_workers=1)
+    #
+    # model.train_brats(trainloader)
 
     # this loads either lidc or uzh data
     data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)

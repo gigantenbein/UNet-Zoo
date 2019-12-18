@@ -315,5 +315,5 @@ if __name__ == '__main__':
     preprocessing_folder = "/Users/marcgantenbein/scratch/data/MICCAI_BraTS_2018_Data_Training_preproc/"
 
 
-    d = load_and_maybe_process_data(input_folder, preprocessing_folder, (160, 192, 160), 4, (1.0, 1.0, 1.0), force_overwrite=True)
+    d = load_and_maybe_process_data(input_folder, preprocessing_folder, (128, 128, 128), 4, (1.0, 1.0, 1.0), force_overwrite=True)
 

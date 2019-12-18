@@ -37,7 +37,7 @@ class Conv3D(nn.Module):
 
 class Conv3DSequence(nn.Module):
     """Block with 2D convolutions after each other with ReLU activation"""
-    def __init__(self, input_dim, output_dim, kernel=3, depth=2, activation=torch.nn.ReLU, norm=torch.nn.BatchNorm2d, norm_before_activation=True):
+    def __init__(self, input_dim, output_dim, kernel=3, depth=2, activation=torch.nn.ReLU, norm=torch.nn.BatchNorm3d, norm_before_activation=True):
         super(Conv3DSequence, self).__init__()
 
         assert depth >= 1
@@ -74,8 +74,8 @@ class ReversibleSequence(nn.Module):
         for i in range(reversible_depth):
 
             #f and g must both be a nn.Module whos output has the same shape as its input
-            f_func = nn.Sequential(Conv3D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
-            g_func = nn.Sequential(Conv3D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
+            f_func = nn.Sequential(Conv3D(output_dim//2, output_dim//2, kernel_size=3, padding=1))
+            g_func = nn.Sequential(Conv3D(output_dim//2, output_dim//2, kernel_size=3, padding=1))
 
             #we construct a reversible block with our F and G functions
             blocks.append(rv.ReversibleBlock(f_func, g_func))
@@ -100,7 +100,7 @@ class DownConvolutionalBlock(nn.Module):
             layers.append(nn.AvgPool3d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
         if reversible:
-            layers.append(ReversibleSequence(input_dim, output_dim))
+            layers.append(ReversibleSequence(input_dim, output_dim, reversible_depth=1))
         else:
             layers.append(Conv3D(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
 
@@ -128,7 +128,7 @@ class UpConvolutionalBlock(nn.Module):
 
         if self.bilinear:
             if reversible:
-                self.upconv_layer = ReversibleSequence(input_dim, output_dim, reversible_depth=2)
+                self.upconv_layer = ReversibleSequence(input_dim, output_dim, reversible_depth=1)
             else:
                 self.upconv_layer = nn.Sequential(
                     Conv3D(input_dim, output_dim, kernel_size=3, stride=1, padding=1),
@@ -140,7 +140,7 @@ class UpConvolutionalBlock(nn.Module):
 
     def forward(self, x, bridge):
         if self.bilinear:
-            x = nn.Upsample(x, mode='bilinear', scale_factor=2, align_corners=True)
+            x = nn.functional.interpolate(x, mode='trilinear', scale_factor=2, align_corners=True)
             x = self.upconv_layer(x)
 
         assert x.shape[3] == bridge.shape[3]
@@ -162,7 +162,7 @@ class SampleZBlock(nn.Module):
         layers = []
 
         if reversible:
-            layers.append(ReversibleSequence(input_dim, input_dim, reversible_depth=3))
+            layers.append(ReversibleSequence(input_dim, input_dim, reversible_depth=1))
         else:
             for i in range(depth):
                 layers.append(Conv3D(input_dim, input_dim, kernel_size=3, padding=1))
@@ -289,7 +289,7 @@ def increase_resolution(times, input_dim, output_dim):
     module_list = []
     for i in range(times):
         module_list.append(nn.Upsample(
-                    mode='bilinear',
+                    mode='trilinear',
                     scale_factor=2,
                     align_corners=True))
         if i != 0:
@@ -336,7 +336,7 @@ class Likelihood(nn.Module):
             input = self.num_filters[i]
             output = self.num_filters[i]
             if reversible:
-                self.likelihood_ups_path.append(ReversibleSequence(input_dim=2, output_dim=input, reversible_depth=2))
+                self.likelihood_ups_path.append(ReversibleSequence(input_dim=2, output_dim=input, reversible_depth=1))
             else:
                 self.likelihood_ups_path.append(Conv3DSequence(input_dim=2, output_dim=input, depth=2))
 
@@ -349,7 +349,7 @@ class Likelihood(nn.Module):
             output = self.num_filters[i + self.lvl_diff]
 
             if reversible:
-                self.likelihood_post_c_path.append(ReversibleSequence(input_dim=input, output_dim=output, reversible_depth=2))
+                self.likelihood_post_c_path.append(ReversibleSequence(input_dim=input, output_dim=output, reversible_depth=1))
             else:
                 self.likelihood_post_c_path.append(Conv3DSequence(input_dim=input, output_dim=output, depth=2))
 
@@ -379,9 +379,9 @@ class Likelihood(nn.Module):
         post_c[self.latent_levels - 1] = post_z[self.latent_levels - 1]
 
         for i in reversed(range(self.latent_levels - 1)):
-            ups_below = nn.Upsample(
+            ups_below = nn.functional.interpolate(
                 post_c[i+1],
-                mode='bilinear',
+                mode='trilinear',
                 scale_factor=2,
                 align_corners=True)
 
@@ -395,7 +395,7 @@ class Likelihood(nn.Module):
 
         for i, block in enumerate(self.s_layer):
             s_in = block(post_c[-i-1]) # no activation in the last layer
-            s[-i-1] = torch.nn.Upsample(s_in, size=[self.image_size[1], self.image_size[2]], mode='nearest')
+            s[-i-1] = nn.functional.interpolate(s_in, size=[self.image_size[1], self.image_size[2]], mode='nearest')
 
         return s
 

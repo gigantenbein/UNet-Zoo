@@ -75,8 +75,8 @@ class ReversibleSequence(nn.Module):
         for i in range(reversible_depth):
 
             #f and g must both be a nn.Module whos output has the same shape as its input
-            f_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
-            g_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1), nn.ReLU())
+            f_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1))
+            g_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1))
 
             #we construct a reversible block with our F and G functions
             blocks.append(rv.ReversibleBlock(f_func, g_func))
@@ -416,10 +416,11 @@ class PHISeg(nn.Module):
                  num_classes,
                  num_filters,
                  latent_levels=5,
+                 latent_dim=2,
                  initializers=None,
                  no_convs_fcomb=4,
                  beta=10.0,
-                 image_size=(128,128,1),
+                 image_size=(128, 128, 1),
                  reversible=False,
                  apply_last_layer=True,
                  exponential_weighting=True,
