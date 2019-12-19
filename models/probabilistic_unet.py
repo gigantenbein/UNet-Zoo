@@ -7,17 +7,27 @@ from utils import init_weights, init_weights_orthogonal_normal
 from torch.distributions import Normal, Independent, kl
 import numpy as np
 from utils import l2_regularisation
+import utils
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class Encoder(nn.Module):
     """
-    A convolutional neural network, consisting of len(num_filters) times a block of no_convs_per_block convolutional layers,
-    after each block a pooling operation is performed. And after each convolutional layer a non-linear (ReLU) activation function is applied.
+    A convolutional neural network, consisting of len(num_filters) times a block of no_convs_per_block convolutional
+    layers, after each block a pooling operation is performed. And after each convolutional layer a non-linear (ReLU)
+    activation function is applied.
     """
 
-    def __init__(self, input_channels, num_filters, no_convs_per_block, initializers, padding=True, posterior=False):
+    def __init__(self,
+                 input_channels,
+                 num_filters,
+                 no_convs_per_block,
+                 num_classes=2,
+                 initializers=None,
+                 padding=True,
+                 posterior=False):
+
         super(Encoder, self).__init__()
         self.contracting_path = nn.ModuleList()
         self.input_channels = input_channels
@@ -25,7 +35,7 @@ class Encoder(nn.Module):
 
         if posterior:
             # To accomodate for the mask that is concatenated at the channel axis, we increase the input_channels.
-            self.input_channels += 1
+            self.input_channels += num_classes
 
         layers = []
         for i in range(len(self.num_filters)):
@@ -72,30 +82,28 @@ class AxisAlignedConvGaussian(nn.Module):
             self.name = 'Posterior'
         else:
             self.name = 'Prior'
-        self.encoder = Encoder(self.input_channels, self.num_filters, self.no_convs_per_block, initializers,
+        self.encoder = Encoder(self.input_channels,
+                               self.num_filters,
+                               self.no_convs_per_block,
+                               initializers=initializers,
                                posterior=self.posterior)
         self.conv_layer = nn.Conv2d(num_filters[-1], 2 * self.latent_dim, (1, 1), stride=1)
-        self.show_img = 0
-        self.show_seg = 0
-        self.show_concat = 0
-        self.show_enc = 0
+
         self.sum_input = 0
 
         nn.init.kaiming_normal_(self.conv_layer.weight, mode='fan_in', nonlinearity='relu')
         nn.init.normal_(self.conv_layer.bias)
 
     def forward(self, input, segm=None):
-
-        # If segmentation is not none, concatenate the mask to the channel axis of the input
         if segm is not None:
-            self.show_img = input
-            self.show_seg = segm
-            input = torch.cat((input, segm), dim=1)
-            self.show_concat = input
-            self.sum_input = torch.sum(input)
+            with torch.no_grad():
+                segm_one_hot = utils.convert_batch_to_onehot(segm, nlabels=2) \
+                    .to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+
+                segm_one_hot = segm_one_hot.float()
+            input = torch.cat([input, torch.add(segm_one_hot, -0.5)], dim=1)
 
         encoding = self.encoder(input)
-        self.show_enc = encoding
 
         # We only want the mean of the resulting hxw image
         encoding = torch.mean(encoding, dim=2, keepdim=True)
@@ -218,17 +226,18 @@ class ProbabilisticUnet(nn.Module):
         self.initializers = {'w': 'he_normal', 'b': 'normal'}
         self.z_prior_sample = 0
 
-        self.unet = Unet(self.input_channels, self.num_classes, self.num_filters, self.initializers,
-                         apply_last_layer=False, padding=True, reversible=reversible).to(device)
+        self.unet = Unet(self.input_channels, self.num_classes, self.num_filters, initializers=self.initializers,
+                         apply_last_layer=False, padding=True, reversible=reversible
+                         ).to(device)
         self.prior = AxisAlignedConvGaussian(self.input_channels, self.num_filters, self.no_convs_per_block,
-                                             self.latent_dim, self.initializers, ).to(device)
+                                             self.latent_dim, initializers=self.initializers).to(device)
         self.posterior = AxisAlignedConvGaussian(self.input_channels, self.num_filters, self.no_convs_per_block,
-                                                  self.latent_dim, self.initializers, posterior=True).to(device)
+                                                  self.latent_dim, initializers=self.initializers, posterior=True
+                                                 ).to(device)
         self.fcomb = Fcomb(self.num_filters, self.latent_dim, self.input_channels, self.num_classes,
-                           self.no_convs_fcomb, {'w': 'orthogonal', 'b': 'normal'}, use_tile=True).to(device)
+                           self.no_convs_fcomb, initializers={'w': 'orthogonal', 'b': 'normal'}, use_tile=True
+                           ).to(device)
 
-        # self.fcomb = Fcomb(self.num_filters, self.latent_dim, self.input_channels, self.num_classes,
-        #                   self.no_convs_fcomb, self.initializers, use_tile=True).to(device)
         self.last_conv = nn.Conv2d(32, num_classes, kernel_size=1)
 
     def forward(self, patch, segm=None, training=True):
@@ -278,7 +287,6 @@ class ProbabilisticUnet(nn.Module):
         return s_accum
 
     def KL_two_gauss_with_diag_cov(self, mu0, sigma0, mu1, sigma1):
-
         sigma0_fs = torch.mul(torch.flatten(sigma0, start_dim=1), torch.flatten(sigma0, start_dim=1))
         sigma1_fs = torch.mul(torch.flatten(sigma1, start_dim=1), torch.flatten(sigma0, start_dim=1))
 
@@ -302,20 +310,20 @@ class ProbabilisticUnet(nn.Module):
         analytic: calculate KL analytically or via sampling from the posterior
         calculate_posterior: if we use samapling to approximate KL we can sample here or supply a sample
         """
-        if analytic:
-            # Neeed to add this to torch source code, see: https://github.com/pytorch/pytorch/issues/13545
-            kl_div = kl.kl_divergence(self.posterior_latent_space, self.prior_latent_space)
-        else:
-            if calculate_posterior:
-                z_posterior = self.posterior_latent_space.rsample()
-            log_posterior_prob = self.posterior_latent_space.log_prob(z_posterior)
-            log_prior_prob = self.prior_latent_space.log_prob(z_posterior)
-            kl_div = log_posterior_prob - log_prior_prob
-        # mu0 = self.posterior_latent_space.mean
-        # sigma0 = self.posterior_latent_space.stddev
-        # mu1 = self.prior_latent_space.mean
-        # sigma1 = self.prior_latent_space.stddev
-        # kl_div = self.KL_two_gauss_with_diag_cov(mu0, sigma0, mu1, sigma1)
+        # if analytic:
+        #     # Neeed to add this to torch source code, see: https://github.com/pytorch/pytorch/issues/13545
+        #     kl_div = kl.kl_divergence(self.posterior_latent_space, self.prior_latent_space)
+        # else:
+        #     if calculate_posterior:
+        #         z_posterior = self.posterior_latent_space.rsample()
+        #     log_posterior_prob = self.posterior_latent_space.log_prob(z_posterior)
+        #     log_prior_prob = self.prior_latent_space.log_prob(z_posterior)
+        #     kl_div = log_posterior_prob - log_prior_prob
+        mu0 = self.posterior_latent_space.mean
+        sigma0 = self.posterior_latent_space.stddev
+        mu1 = self.prior_latent_space.mean
+        sigma1 = self.prior_latent_space.stddev
+        kl_div = self.KL_two_gauss_with_diag_cov(mu0, sigma0, mu1, sigma1)
         return kl_div
 
     def multinoulli_loss(self, reconstruction, target):

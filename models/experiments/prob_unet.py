@@ -12,7 +12,7 @@ data_loader = lidc_data
 # number of filter for the latent levels, they will be applied in the order as loaded into the list
 filter_channels = [32, 64, 128, 192, 192, 192, 192]
 latent_levels = 1
-latent_dim = 6
+latent_dim = 2
 
 iterations = 5000000
 
@@ -42,7 +42,7 @@ input_normalisation = normalise_image
 validation_samples = 16
 num_validation_images = 100
 
-logging_frequency = 10
+logging_frequency = 1
 validation_frequency = 1000
 
 weight_decay = 10e-5
