@@ -3,27 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import revtorch as rv
 from utils import init_weights
-
-
-class ReversibleSequence(nn.Module):
-    def __init__(self, in_size, out_size, reversible_depth=3):
-        super(ReversibleSequence, self).__init__()
-        blocks = []
-        for i in range(reversible_depth):
-
-            #f and g must both be a nn.Module whos output has the same shape as its input
-            f_func = nn.Sequential(nn.Conv2d(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
-            g_func = nn.Sequential(nn.Conv2d(in_size//2, out_size//2, 3, padding=1), nn.ReLU())
-
-            #we construct a reversible block with our F and G functions
-            blocks.append(rv.ReversibleBlock(f_func, g_func))
-
-        #pack all reversible blocks into a reversible sequence
-        self.sequence = rv.ReversibleSequence(nn.ModuleList(blocks))
-
-    def forward(self, x):
-        return self.sequence(x)
-
+from torchlayers import ReversibleSequence
 
 class DownConvBlock(nn.Module):
     """
@@ -46,9 +26,7 @@ class DownConvBlock(nn.Module):
             layers.append(nn.ReLU(inplace=True))
             self.layers = nn.Sequential(*layers)
         else:
-            layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
-            layers.append(nn.ReLU(inplace=True))
-            layers.append(ReversibleSequence(output_dim, output_dim))
+            layers.append(ReversibleSequence(input_dim, output_dim, reversible_depth=3))
 
             self.layers = nn.Sequential(*layers)
 
@@ -100,7 +78,7 @@ class Unet(nn.Module):
     num_classes: the number of classes to predict
     num_filters: list with the amount of filters per layer
     apply_last_layer: boolean to apply last layer or not (not used in Probabilistic UNet)
-    padidng: Boolean, if true we pad the images with 1 so that we keep the same dimensions
+    padding: Boolean, if true we pad the images with 1 so that we keep the same dimensions
     """
 
     def __init__(self, input_channels, num_classes, num_filters,

@@ -9,6 +9,8 @@ import numpy as np
 from utils import l2_regularisation
 import utils
 
+from  torchlayers import Conv2D, Conv2DSequence, ReversibleSequence
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -49,12 +51,10 @@ class Encoder(nn.Module):
             if i != 0:
                 layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
-            layers.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, padding=int(padding)))
-            layers.append(nn.ReLU(inplace=True))
+            layers.append(Conv2D(input_dim, output_dim, kernel_size=3, padding=int(padding)))
 
             for _ in range(no_convs_per_block - 1):
-                layers.append(nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=int(padding)))
-                layers.append(nn.ReLU(inplace=True))
+                layers.append(Conv2D(output_dim, output_dim, kernel_size=3, padding=int(padding)))
 
         self.layers = nn.Sequential(*layers)
 
@@ -87,7 +87,7 @@ class AxisAlignedConvGaussian(nn.Module):
                                self.no_convs_per_block,
                                initializers=initializers,
                                posterior=self.posterior)
-        self.conv_layer = nn.Conv2d(num_filters[-1], 2 * self.latent_dim, (1, 1), stride=1)
+        self.conv_layer = nn.Conv2d(num_filters[-1], 2 * self.latent_dim, kernel_size=1, stride=1)
 
         self.sum_input = 0
 
@@ -148,12 +148,10 @@ class Fcomb(nn.Module):
             layers = []
 
             # Decoder of N x a 1x1 convolution followed by a ReLU activation function except for the last layer
-            layers.append(nn.Conv2d(self.num_filters[0] + self.latent_dim, self.num_filters[0], kernel_size=1))
-            layers.append(nn.ReLU(inplace=True))
+            layers.append(Conv2D(self.num_filters[0] + self.latent_dim, self.num_filters[0], kernel_size=1))
 
             for _ in range(no_convs_fcomb - 2):
-                layers.append(nn.Conv2d(self.num_filters[0], self.num_filters[0], kernel_size=1))
-                layers.append(nn.ReLU(inplace=True))
+                layers.append(Conv2D(self.num_filters[0], self.num_filters[0], kernel_size=1))
 
             self.layers = nn.Sequential(*layers)
 
@@ -238,7 +236,7 @@ class ProbabilisticUnet(nn.Module):
                            self.no_convs_fcomb, initializers={'w': 'orthogonal', 'b': 'normal'}, use_tile=True
                            ).to(device)
 
-        self.last_conv = nn.Conv2d(32, num_classes, kernel_size=1)
+        self.last_conv = Conv2D(32, num_classes, kernel_size=1, activation=torch.nn.Identity, norm=torch.nn.Identity)
 
     def forward(self, patch, segm=None, training=True):
         """
