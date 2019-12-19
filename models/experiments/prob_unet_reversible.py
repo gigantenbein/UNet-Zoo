@@ -42,7 +42,7 @@ input_normalisation = normalise_image
 validation_samples = 16
 num_validation_images = 100
 
-logging_frequency = 1
+logging_frequency = 1000
 validation_frequency = 1000
 
 weight_decay = 10e-5

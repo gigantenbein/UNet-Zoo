@@ -243,7 +243,7 @@ class ProbabilisticUnet(nn.Module):
         Construct prior latent space for patch and run patch through UNet,
         in case training is True also construct posterior latent space
         """
-        if training:
+        if segm is not None: # construct posterior latent space aswell e.g. during validation
             self.posterior_latent_space = self.posterior.forward(patch, segm)
         self.prior_latent_space = self.prior.forward(patch)
         self.unet_features = self.unet.forward(patch, False)
