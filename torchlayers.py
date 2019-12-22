@@ -1,3 +1,4 @@
+"""Custom layers with activation and norm for code readability"""
 import torch
 import torch.nn as nn
 import revtorch as rv

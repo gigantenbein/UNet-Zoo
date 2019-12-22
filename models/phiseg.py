@@ -414,7 +414,9 @@ class PHISeg(nn.Module):
     def forward(self, patch, mask, training=True):
         if training:
             self.posterior_latent_space, self.posterior_mu, self.posterior_sigma = self.posterior(patch, mask)
-            self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch, training_prior=True, z_list=self.posterior_latent_space)
+            self.prior_latent_space, self.prior_mu, self.prior_sigma = self.prior(patch,
+                                                                                  training_prior=True,
+                                                                                  z_list=self.posterior_latent_space)
             self.s_out_list = self.likelihood(self.posterior_latent_space)
         else:
             self.posterior_latent_space, self.posterior_mu, self.posterior_sigma = self.posterior(patch, mask)

@@ -404,11 +404,15 @@ class UNetModel:
                         per_lbl_dice.append(0.0)
                     else:
                         per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(), binary_gt.detach().cpu().numpy()))
-
                 dice_list.append(per_lbl_dice)
 
                 ged_list.append(ged)
                 ncc_list.append(ncc)
+
+                if ii % 100 == 0:
+                    self.logger.info(' - Mean GED: %.4f' % torch.mean(torch.tensor(ged_list)))
+                    self.logger.info(' - Mean NCC: %.4f' % torch.mean(torch.tensor(ncc_list)))
+
 
             dice_tensor = torch.tensor(dice_list)
             per_structure_dice = dice_tensor.mean(dim=0)
@@ -416,17 +420,32 @@ class UNetModel:
             ged_tensor = torch.tensor(ged_list)
             ncc_tensor = torch.tensor(ncc_list)
 
+            model_path = os.path.join(
+                sys_config.log_root,
+                self.exp_config.log_dir_name,
+                self.exp_config.experiment_name)
+
+            np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_tensor.numpy())
+            np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_tensor.numpy())
+
             self.avg_dice = torch.mean(dice_tensor)
             self.foreground_dice = torch.mean(dice_tensor, dim=0)[1]
 
             self.avg_ged = torch.mean(ged_tensor)
             self.avg_ncc = torch.mean(ncc_tensor)
 
+            logging.info('-- GED: --')
+            logging.info(torch.mean(ged_tensor))
+            logging.info(torch.std(ged_tensor))
+
+            logging.info('-- NCC: --')
+            logging.info(torch.mean(ncc_tensor))
+            logging.info(torch.std(ncc_tensor))
+
             self.logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
             self.logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
             self.logger.info(' - Mean GED: %.4f' % self.avg_ged)
             self.logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
-
 
             self.logger.info('Testing took {} seconds'.format(time.time() - time_))
 

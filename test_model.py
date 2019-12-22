@@ -19,7 +19,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Script for training")
     parser.add_argument("EXP_PATH", type=str, help="Path to experiment config file")
     parser.add_argument("LOCAL", type=str, help="Is this script run on the local machine or the BIWI cluster?")
-    parser.add_argument("dummy", type=str, help="Is the module run with dummy training?")
     args = parser.parse_args()
 
     config_file = args.EXP_PATH
@@ -36,13 +35,14 @@ if __name__ == '__main__':
 
     log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
 
+    utils.makefolder(log_dir)
+
+    shutil.copy(exp_config.__file__, log_dir)
+
     basic_logger = utils.setup_logger('basic_logger', log_dir + '/test_log.log')
 
     basic_logger.info('Running experiment with script: {}'.format(config_file))
 
-    utils.makefolder(log_dir)
-
-    shutil.copy(exp_config.__file__, log_dir)
     basic_logger.info('!!!! Copied exp_config file to experiment folder !!!!')
 
     basic_logger.info('**************************************************************')

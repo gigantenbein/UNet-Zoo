@@ -202,10 +202,9 @@ def variance_ncc_dist(sample_arr, gt_arr):
 
     def pixel_wise_xent(m_samp, m_gt, eps=1e-8):
 
-
         log_samples = np.log(m_samp + eps)
 
-        return -1.0*np.sum(m_gt*log_samples, axis=1)
+        return -1.0*np.sum(m_gt*log_samples, axis=0)
 
     """
     :param sample_arr: expected shape N x X x Y 
@@ -220,8 +219,8 @@ def variance_ncc_dist(sample_arr, gt_arr):
     N = sample_arr.shape[0]
     M = gt_arr.shape[0]
 
-    sX = sample_arr.shape[1]
-    sY = sample_arr.shape[2]
+    sX = sample_arr.shape[2]
+    sY = sample_arr.shape[3]
 
     E_ss_arr = np.zeros((N,sX,sY))
     for i in range(N):
@@ -337,7 +336,7 @@ def setup_logger(name, log_file, level=logging.INFO):
     """To setup as many loggers as you want"""
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 
-    handler = logging.FileHandler(log_file)
+    handler = logging.FileHandler(log_file, mode='w')
     handler.setFormatter(formatter)
 
     logger = logging.getLogger(name)
