@@ -51,6 +51,7 @@ class uzh_data():
 if __name__ == '__main__':
 
     # If the program is called as main, perform some debugging operations
-    from models.experiments import phiseg_uzh_rev_7_5_12 as exp_config
-    data = uzh_data(exp_config)
+    from models.experiments import phiseg_uzh_rev_7_5_192 as exp_config
+    from config import local_config as sys_config
+    data = uzh_data(sys_config, exp_config)
 
