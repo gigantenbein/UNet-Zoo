@@ -15,6 +15,7 @@ import math
 
 # own files
 import utils
+from data.batch_provider import resize_batch
 import data.bratsDataset as bratsDataset
 
 # catch all the warnings with the debugger

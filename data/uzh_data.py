@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy.io import loadmat
-from data.batch_provider import BatchProvider
+from data.batch_provider import BatchProvider, resize_batch
 
 class uzh_data():
 
@@ -41,11 +41,15 @@ class uzh_data():
                                   annotator_range=annotator_range,
                                   resize_to=resize_to)
 
-        self.test.images = data['X'][-50:]
-        self.test.labels = data['y'][-50:]
+        self.test.images = resize_batch(data['X'][-50:], target_size=resize_to)
+        self.test.labels = resize_batch(data['y'][-50:], target_size=resize_to).reshape((-1,
+                                                                                     resize_to[0],resize_to[1],
+                                                                                     exp_config.num_labels_per_subject))
 
-        self.validation.images = data['X'][-100:-50]
-        self.validation.labels = data['y'][-100:-50]
+        self.validation.images = resize_batch(data['X'][-100:-50], target_size=resize_to)
+        self.validation.labels = resize_batch(data['y'][-100:-50], target_size=resize_to).reshape((-1,
+                                                                                               resize_to[0],resize_to[1],
+                                                                                               exp_config.num_labels_per_subject))
 
 
 if __name__ == '__main__':
