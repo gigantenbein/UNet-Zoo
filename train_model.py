@@ -29,7 +29,7 @@ class UNetModel:
         Args:
             exp_config: Experiment configuration file as given in the experiment folder
     '''
-    def __init__(self, exp_config, logger=None):
+    def __init__(self, exp_config, logger=None, tensorboard=True):
 
         self.net = exp_config.model(input_channels=exp_config.input_channels,
                                     num_classes=exp_config.n_classes,
@@ -80,8 +80,9 @@ class UNetModel:
         self.best_ged = np.inf
         self.best_ncc = -1
 
-        self.training_writer = SummaryWriter()
-        self.validation_writer = SummaryWriter(comment='_validation')
+        if tensorboard:
+            self.training_writer = SummaryWriter()
+            self.validation_writer = SummaryWriter(comment='_validation')
         self.iteration = 0
 
     def train(self, data):

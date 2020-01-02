@@ -49,7 +49,7 @@ if __name__ == '__main__':
     basic_logger.info(' *** Running Experiment: %s', exp_config.experiment_name)
     basic_logger.info('**************************************************************')
 
-    model = UNetModel(exp_config, logger=basic_logger)
+    model = UNetModel(exp_config, logger=basic_logger, tensorboard=False)
     transform = None
 
     data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)
