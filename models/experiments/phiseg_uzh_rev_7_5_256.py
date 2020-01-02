@@ -38,7 +38,7 @@ augmentation_options = {'do_flip_lr': True,
 input_normalisation = normalise_image
 
 validation_samples = 16
-num_validation_images = 100
+num_validation_images = 'all'
 
 logging_frequency = 1000
 validation_frequency = 1000
