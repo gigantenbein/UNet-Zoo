@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     shutil.copy(exp_config.__file__, log_dir)
 
-    basic_logger = utils.setup_logger('basic_logger', log_dir + '/test_log.log')
+    basic_logger = utils.setup_logger('basic_logger', log_dir + '/test_log2.log')
 
     basic_logger.info('Running experiment with script: {}'.format(config_file))
 

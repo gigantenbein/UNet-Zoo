@@ -426,8 +426,8 @@ class UNetModel:
                 self.exp_config.log_dir_name,
                 self.exp_config.experiment_name)
 
-            np.savez(os.path.join(model_path, 'ged%s_%s.npz' % (str(n_samples), model_selection)), ged_tensor.numpy())
-            np.savez(os.path.join(model_path, 'ncc%s_%s.npz' % (str(n_samples), model_selection)), ncc_tensor.numpy())
+            np.savez(os.path.join(model_path, 'ged%s_%s_2.npz' % (str(n_samples), model_selection)), ged_tensor.numpy())
+            np.savez(os.path.join(model_path, 'ncc%s_%s_2.npz' % (str(n_samples), model_selection)), ncc_tensor.numpy())
 
             self.avg_dice = torch.mean(dice_tensor)
             self.foreground_dice = torch.mean(dice_tensor, dim=0)[1]
