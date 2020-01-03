@@ -114,6 +114,7 @@ class UNetModel:
 
             self.loss.backward()
             self.optimizer.step()
+            self.logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
 
             if self.iteration % self.exp_config.validation_frequency == 0:
                 self.validate(data)

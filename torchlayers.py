@@ -56,7 +56,7 @@ class ReversibleSequence(nn.Module):
     """This class implements a a reversible sequence made out of n convolutions with ReLU activation and BN
         There is an initial 1x1 convolution to get to the desired number of channels.
     """
-    def __init__(self, input_dim, output_dim, reversible_depth=3):
+    def __init__(self, input_dim, output_dim, reversible_depth=3, kernel=3):
         super(ReversibleSequence, self).__init__()
 
         if input_dim  != output_dim:
@@ -68,8 +68,8 @@ class ReversibleSequence(nn.Module):
         for i in range(reversible_depth):
 
             #f and g must both be a nn.Module whos output has the same shape as its input
-            f_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1))
-            g_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=3, padding=1))
+            f_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=kernel, padding=1))
+            g_func = nn.Sequential(Conv2D(output_dim//2, output_dim//2, kernel_size=kernel, padding=1))
 
             #we construct a reversible block with our F and G functions
             blocks.append(rv.ReversibleBlock(f_func, g_func))

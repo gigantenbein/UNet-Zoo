@@ -28,7 +28,8 @@ class Encoder(nn.Module):
                  num_classes=2,
                  initializers=None,
                  padding=True,
-                 posterior=False):
+                 posterior=False,
+                 reversible=False):
 
         super(Encoder, self).__init__()
         self.contracting_path = nn.ModuleList()
@@ -51,10 +52,11 @@ class Encoder(nn.Module):
             if i != 0:
                 layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
-            layers.append(Conv2D(input_dim, output_dim, kernel_size=3, padding=int(padding)))
-
-            for _ in range(no_convs_per_block - 1):
-                layers.append(Conv2D(output_dim, output_dim, kernel_size=3, padding=int(padding)))
+            # subtract 1 to account for the convolution which is not reversible
+            if reversible:
+                layers.append(ReversibleSequence(input_dim, output_dim, kernel=3, reversible_depth=no_convs_per_block-1))
+            else:
+                layers.append(Conv2DSequence(input_dim, output_dim, kernel=3, depth=no_convs_per_block))
 
         self.layers = nn.Sequential(*layers)
 
