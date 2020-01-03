@@ -23,7 +23,7 @@ class DownConvolutionalBlock(nn.Module):
             layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
 
         if reversible:
-            layers.append(ReversibleSequence(input_dim, output_dim))
+            layers.append(ReversibleSequence(input_dim, output_dim, reversible_depth=3))
         else:
             layers.append(Conv2D(input_dim, output_dim, kernel_size=3, stride=1, padding=int(padding)))
 
