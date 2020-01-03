@@ -91,6 +91,7 @@ class UNetModel:
         self.logger.info('Current filters: {}'.format(self.exp_config.filter_channels))
         self.logger.info('Batch size: {}'.format(self.batch_size))
 
+        self.validate(data)
         for self.iteration in range(1, self.exp_config.iterations):
             x_b, s_b = data.train.next_batch(self.batch_size)
 
@@ -114,7 +115,6 @@ class UNetModel:
 
             self.loss.backward()
             self.optimizer.step()
-            self.logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
 
             if self.iteration % self.exp_config.validation_frequency == 0:
                 self.validate(data)
