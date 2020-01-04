@@ -91,7 +91,6 @@ class UNetModel:
         self.logger.info('Current filters: {}'.format(self.exp_config.filter_channels))
         self.logger.info('Batch size: {}'.format(self.batch_size))
 
-        self.validate(data)
         for self.iteration in range(1, self.exp_config.iterations):
             x_b, s_b = data.train.next_batch(self.batch_size)
 
@@ -498,11 +497,11 @@ if __name__ == '__main__':
     model = UNetModel(exp_config, logger=basic_logger)
     transform = None
 
-    # trainset = bratsDataset.BratsDataset(sys_config.brats_root, exp_config, mode="train", randomCrop=None)
-    # trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, pin_memory=True,
-    #                                           num_workers=1)
-    #
-    # model.train_brats(trainloader)
+    trainset = bratsDataset.BratsDataset(sys_config.brats_root, exp_config, mode="train", randomCrop=None)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, pin_memory=True,
+                                              num_workers=1)
+
+    model.train_brats(trainloader)
 
     # this loads either lidc or uzh data
     data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)
