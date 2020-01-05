@@ -496,7 +496,7 @@ if __name__ == '__main__':
 
     model = UNetModel(exp_config, logger=basic_logger)
     transform = None
-
+    #
     # trainset = bratsDataset.BratsDataset(sys_config.brats_root, exp_config, mode="train", randomCrop=None)
     # trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, pin_memory=True,
     #                                           num_workers=1)
@@ -505,6 +505,7 @@ if __name__ == '__main__':
 
     # this loads either lidc or uzh data
     data = exp_config.data_loader(sys_config=sys_config, exp_config=exp_config)
+
     model.train(data)
 
     model.save_model('last')

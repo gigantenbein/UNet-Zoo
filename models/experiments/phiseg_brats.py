@@ -16,7 +16,7 @@ latent_levels = 2
 iterations = 5000000
 
 n_classes = 3
-num_labels_per_subject = 4
+num_labels_per_subject = 1
 
 no_convs_fcomb = 4 # not used
 beta = 10.0 # not used
@@ -25,10 +25,10 @@ use_reversible = True
 exponential_weighting = True
 
 # use 1 for grayscale, 3 for RGB images
-input_channels = 7
+input_channels = 4
 epochs_to_train = 20
 batch_size = 1
-image_size = (7,128,128,128)
+image_size = (4,128,128,128)
 
 augmentation_options = {'do_flip_lr': True,
                         'do_flip_ud': True,

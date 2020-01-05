@@ -364,3 +364,18 @@ def test_segmentation(exp_config, sys_config, amount_of_tests=1000):
             #comparison = sample.view(-1, 1, 128, 128)
             save_image(comparison.cpu(),
                        'segmentation/' + exp_config.experiment_name + '/comp_' + str(ii) + '.png', nrow=n)
+
+
+def generate_images():
+    from torchvision.utils import save_image
+    for ii in range(100):
+        save_patch = torch.tensor(data.validation.images[ii, ...], dtype=torch.float)
+        save_labels = torch.tensor(data.validation.labels[ii, ...], dtype=torch.float) # HWC
+
+        save_labels = save_labels.transpose(0,2).transpose(1,2) #CHW
+        save_labels = save_labels.view(-1,1,128,128)
+        save_patch = save_patch.view(-1,1,128,128)
+
+        save = torch.cat([save_patch, save_labels], dim=0)
+
+        save_image(save, 'test{}.png'.format(ii), pad_value=1, scale_each=True, normalize=True)
