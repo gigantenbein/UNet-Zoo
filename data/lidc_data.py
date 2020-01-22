@@ -64,8 +64,8 @@ if __name__ == '__main__':
     print("Shape of validation images LIDC: {}".format(lidc.validation.images.shape))
     print("Shape of validation labels LIDC: {}".format(lidc.validation.labels.shape))
 
-    from data import uzh_data
-    uzh = uzh_data.uzh_data(sys_config=sys_config, exp_config=exp_config)
+    from data import uzh_prostate_data
+    uzh = uzh_prostate_data.uzh_prostate_data(sys_config=sys_config, exp_config=exp_config)
     print("Shape of test images uzh: {}".format(uzh.test.images.shape))
     print("Shape of test labels uzh: {}".format(uzh.test.labels.shape))
 

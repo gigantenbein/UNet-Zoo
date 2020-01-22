@@ -3,6 +3,72 @@
 import numpy as np
 from scipy.io import loadmat
 from data.batch_provider import BatchProvider, resize_batch
+import os
+import h5py
+
+
+def load_uzh_data(input_file, output_file):
+    '''
+    Main function that prepares a dataset from the raw challenge data to an hdf5 dataset
+    '''
+
+    hdf5_file = h5py.File(output_file, "w")
+    max_bytes = 2 ** 31 - 1
+
+    data = {}
+    file_path = os.fsdecode(input_file)
+    bytes_in = bytearray(0)
+    input_size = os.path.getsize(file_path)
+    with open(file_path, 'rb') as f_in:
+        for _ in range(0, input_size, max_bytes):
+            bytes_in += f_in.read(max_bytes)
+    new_data = pickle.loads(bytes_in)
+    data.update(new_data)
+
+    series_uid = []
+
+    for key, value in data.items():
+        series_uid.append(value['series_uid'])
+
+    unique_subjects = np.unique(series_uid)
+
+    split_ids = {}
+    train_and_val_ids, split_ids['test'] = train_test_split(unique_subjects, test_size=0.2)
+    split_ids['train'], split_ids['val'] = train_test_split(train_and_val_ids, test_size=0.2)
+
+    images = {}
+    labels = {}
+    uids = {}
+    groups = {}
+
+    for tt in ['train', 'test', 'val']:
+        images[tt] = []
+        labels[tt] = []
+        uids[tt] = []
+        groups[tt] = hdf5_file.create_group(tt)
+
+    for key, value in data.items():
+
+        s_id = value['series_uid']
+
+        tt = find_subset_for_id(split_ids, s_id)
+
+        images[tt].append(value['image'].astype(float)-0.5)
+
+        lbl = np.asarray(value['masks'])  # this will be of shape 4 x 128 x 128
+        lbl = lbl.transpose((1,2,0))
+
+        labels[tt].append(lbl)
+        uids[tt].append(hash(s_id))  # Checked manually that there are no collisions
+
+    for tt in ['test', 'train', 'val']:
+
+        groups[tt].create_dataset('uids', data=np.asarray(uids[tt], dtype=np.int))
+        groups[tt].create_dataset('labels', data=np.asarray(labels[tt], dtype=np.uint8))
+        groups[tt].create_dataset('images', data=np.asarray(images[tt], dtype=np.float))
+
+    hdf5_file.close()
+
 
 class uzh_data():
 
