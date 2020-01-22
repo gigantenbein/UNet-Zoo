@@ -48,8 +48,8 @@ class uzh_prostate_data():
         augmentation_options = exp_config.augmentation_options
 
         # Backwards compatibility, TODO remove for final version
-        # if not hasattr(exp_config, 'annotator_range'):
-        #     exp_config.annotator_range = range(exp_config.num_labels_per_subject)
+        if not hasattr(exp_config, 'annotator_range'):
+             exp_config.annotator_range = range(exp_config.num_labels_per_subject)
 
         self.train = BatchProvider(images_train, labels_train, train_indices,
                                    add_dummy_dimension=True,
