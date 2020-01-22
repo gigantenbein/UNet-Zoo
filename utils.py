@@ -4,6 +4,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from medpy.metric import jc
 import logging
+import nibabel as nib
 
 import numpy as np
 import os
@@ -345,3 +346,25 @@ def setup_logger(name, log_file, level=logging.INFO):
 
     return logger
 
+def load_nii(img_path):
+
+    '''
+    Shortcut to load a nifti file
+    '''
+
+    nimg = nib.load(img_path)
+    return nimg.get_data(), nimg.affine, nimg.header
+
+def save_nii(img_path, data, affine, header):
+    '''
+    Shortcut to save a nifty file
+    '''
+
+    nimg = nib.Nifti1Image(data, affine=affine, header=header)
+    nimg.to_filename(img_path)
+
+
+def create_and_save_nii(data, img_path):
+
+    img = nib.Nifti1Image(data, np.eye(4))
+    nib.save(img, img_path)
