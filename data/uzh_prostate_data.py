@@ -15,8 +15,8 @@ class uzh_prostate_data():
             input_image_folder=exp_config.input_image_folder,
             input_mask_folder=exp_config.input_mask_folder,
             preprocessing_folder=exp_config.preproc_folder,
-            size=exp_config.image_size[0:2],
-            target_resolution=exp_config.target_resolution,
+            size=exp_config.image_size[1:3],
+            target_resolution=(0.6, 0.6),
             force_overwrite=False,
         )
 
