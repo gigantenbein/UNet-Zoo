@@ -6,9 +6,6 @@ from utils import normalise_image
 experiment_name = 'PHISegUZH_7_5_256'
 log_dir_name = 'uzh'
 data_loader = uzh_prostate_data
-input_image_folder = '/usr/bmicnas01/data-biwi-01/bmicdatasets-originals/Originals/USZ/Prostate/'
-input_mask_folder = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/UZH_Prostate_annotations_Christian'
-preproc_folder = '/scratch_net/airfox/ganmarc/data/preproc'
 
 # number of filter for the latent levels, they will be applied in the order as loaded into the list
 filter_channels = [32, 64, 128, 192, 192, 192, 192]

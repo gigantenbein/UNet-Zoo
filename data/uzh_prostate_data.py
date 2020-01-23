@@ -12,12 +12,12 @@ class uzh_prostate_data():
     def __init__(self, sys_config, exp_config):
 
         data = uzh_prostate_data_loader.load_and_maybe_process_data(
-            input_image_folder=exp_config.input_image_folder,
-            input_mask_folder=exp_config.input_mask_folder,
-            preprocessing_folder=exp_config.preproc_folder,
+            input_image_folder=sys_config.uzh_input_image_folder,
+            input_mask_folder=sys_config.uzh_input_mask_folder,
+            preprocessing_folder=sys_config.preproc_folder,
             size=exp_config.image_size[1:3],
             target_resolution=(0.6, 0.6),
-            force_overwrite=False,
+            force_overwrite=True,
         )
 
         self.data = data

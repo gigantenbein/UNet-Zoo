@@ -17,6 +17,7 @@ brats_root = '/Users/marcgantenbein/scratch/data/MICCAI_BraTS_2018_Data_Training
 
 preproc_folder = '/Users/marcgantenbein/scratch/data/preproc'
 
-uzh_root = '/Users/marcgantenbein/scratch/data/bias_corrected'
-
 uzh_preproc_folder = '/Users/marcgantenbein/scratch/data/preproc'
+
+uzh_input_image_folder = '/Users/marcgantenbein/scratch/data/uzh/images'
+uzh_input_mask_folder = '/Users/marcgantenbein/scratch/data/uzh/UZH_Prostate_annotations_Christian'
