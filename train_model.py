@@ -120,7 +120,7 @@ class UNetModel:
 
             if self.iteration % self.exp_config.logging_frequency == 0:
                 self.logger.info('Iteration {} Loss {}'.format(self.iteration, self.loss))
-                self._create_tensorboard_summary()
+                #self._create_tensorboard_summary()
                 self.tot_loss = 0
                 self.kl_loss = 0
                 self.reconstruction_loss = 0
