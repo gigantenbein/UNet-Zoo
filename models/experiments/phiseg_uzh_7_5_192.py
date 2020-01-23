@@ -14,7 +14,7 @@ latent_levels = 5
 
 iterations = 5000000
 
-n_classes = 2
+n_classes = 3
 num_labels_per_subject = 6
 
 no_convs_fcomb = 4 # not used

@@ -17,7 +17,7 @@ class uzh_prostate_data():
             preprocessing_folder=sys_config.preproc_folder,
             size=exp_config.image_size[1:3],
             target_resolution=(0.6, 0.6),
-            force_overwrite=True,
+            force_overwrite=False,
         )
 
         self.data = data
