@@ -3,7 +3,7 @@ import torch.nn as nn
 from models.phiseg import PHISeg
 from data.uzh_prostate_data import uzh_prostate_data
 from utils import normalise_image
-experiment_name = 'PHISegUZHRev_7_5_256'
+experiment_name = 'PHISegUZHRev_7_5_224'
 log_dir_name = 'uzh'
 data_loader = uzh_prostate_data
 
