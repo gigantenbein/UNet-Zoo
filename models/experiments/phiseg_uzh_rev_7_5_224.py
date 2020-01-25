@@ -29,7 +29,7 @@ epochs_to_train = 20
 batch_size = 12
 image_size = (1, 224, 224)
 resize_to = [224, 224]
-target_resolution = (0.4, 0.4)
+target_resolution = (0.52, 0.52)
 
 augmentation_options = {'do_flip_lr': True,
                         'do_flip_ud': True,

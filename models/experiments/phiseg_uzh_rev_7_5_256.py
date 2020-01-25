@@ -29,7 +29,7 @@ epochs_to_train = 20
 batch_size = 12
 image_size = (1, 256, 256)
 resize_to = [256, 256]
-target_resolution = (0.4, 0.4)
+target_resolution = (0.45, 0.45) # calculated s.t. 192/200 of pixels is kept, i.e. 4 percent of pixels are cropped
 
 augmentation_options = {'do_flip_lr': True,
                         'do_flip_ud': True,
