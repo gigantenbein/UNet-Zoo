@@ -47,6 +47,6 @@ validation_frequency = 1000
 
 weight_decay = 10e-5
 
-pretrained_model = None
+pretrained_model = 'best_loss'
 # model
 model = PHISeg

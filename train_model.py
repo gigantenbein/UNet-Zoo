@@ -55,10 +55,16 @@ class UNetModel:
 
             model_path = os.path.join(sys_config.project_root, 'models', exp_config.pretrained_model)
 
+            model_name = self.exp_config.experiment_name + '_' + exp_config.pretrained_model + '.pth'
+
+            log_dir = os.path.join(sys_config.log_root, exp_config.log_dir_name, exp_config.experiment_name)
+            save_model_path = os.path.join(log_dir, model_name)
+
             if os.path.exists(model_path):
-                self.net.load_state_dict(torch.load(model_path))
+                self.net.load_state_dict(torch.load(save_model_path))
             else:
-                self.logger.info('The file {} does not exist. Starting training without pretrained net.'.format(model_path))
+                self.logger.info('The file {} does not exist. Starting training without pretrained net.'
+                                 .format(save_model_path))
 
         self.mean_loss_of_epoch = 0
         self.tot_loss = 0
@@ -136,6 +142,10 @@ class UNetModel:
 
             self.logger.info('Checkpointing model.')
             self.save_model('validation_ckpt')
+            if self.device == torch.device('cuda'):
+                allocated_memory = torch.cuda.max_memory_allocated(self.device)
+
+                self.logger.info('Memory allocated in current iteration: {}{}'.format(allocated_memory, self.iteration))
 
             ged_list = []
             dice_list = []
