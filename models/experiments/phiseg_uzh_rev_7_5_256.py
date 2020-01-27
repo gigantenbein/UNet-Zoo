@@ -29,7 +29,7 @@ epochs_to_train = 20
 batch_size = 12
 image_size = (1, 256, 256)
 resize_to = [256, 256]
-target_resolution = (0.45, 0.45) # calculated s.t. 192/200 of pixels is kept, i.e. 4 percent of pixels are cropped
+target_resolution = (0.46875, 0.46875) # calculated s.t. 192/200 of pixels is kept, i.e. 4 percent of pixels are cropped
 
 augmentation_options = {'do_flip_lr': True,
                         'do_flip_ud': True,
@@ -47,6 +47,6 @@ validation_frequency = 1000
 
 weight_decay = 10e-5
 
-pretrained_model = 'best_loss'
+pretrained_model = None
 # model
 model = PHISeg

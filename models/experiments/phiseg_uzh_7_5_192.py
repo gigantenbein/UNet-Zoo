@@ -29,7 +29,7 @@ epochs_to_train = 20
 batch_size = 12
 image_size = (1, 192, 192)
 resize_to = [192, 192]
-target_resolution = (0.6, 0.6)
+target_resolution = (0.625, 0.625)
 
 augmentation_options = {'do_flip_lr': True,
                         'do_flip_ud': True,
@@ -47,6 +47,6 @@ validation_frequency = 1000
 
 weight_decay = 10e-5
 
-pretrained_model = 'best_loss'
+pretrained_model = None
 # model
 model = PHISeg
