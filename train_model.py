@@ -461,6 +461,68 @@ class UNetModel:
 
             self.logger.info('Testing took {} seconds'.format(time.time() - time_))
 
+    def generate_images(self, data, sys_config):
+        self.net.eval()
+        with torch.no_grad():
+
+            model_selection = self.exp_config.experiment_name + '_best_loss.pth'
+            self.logger.info('Generating samples {}'.format(model_selection))
+
+            self.logger.info('Loading pretrained model {}'.format(model_selection))
+
+            model_path = os.path.join(
+                sys_config.log_root,
+                self.exp_config.log_dir_name,
+                self.exp_config.experiment_name,
+                model_selection)
+
+            if os.path.exists(model_path):
+                self.net.load_state_dict(torch.load(model_path))
+            else:
+                self.logger.info('The file {} does not exist. Aborting test function.'.format(model_path))
+                return
+
+            n_samples = 10
+
+            for ii in range(5):
+
+                s_gt_arr = data.test.labels[ii, ...]
+
+                # from HW to NCHW
+                x_b = data.test.images[ii, ...]
+                patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
+                val_patch = patch.unsqueeze(dim=0).unsqueeze(dim=1)
+
+                s_b = s_gt_arr[:, :, np.random.choice(self.exp_config.annotator_range)]
+                mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
+                val_mask = mask.unsqueeze(dim=0).unsqueeze(dim=1)
+                val_masks = torch.tensor(s_gt_arr, dtype=torch.float32).to(self.device)  # HWC
+                val_masks = val_masks.transpose(0, 2).transpose(1, 2)  # CHW
+
+                patch_arrangement = val_patch.repeat((n_samples, 1, 1, 1))
+
+                mask_arrangement = val_mask.repeat((n_samples, 1, 1, 1))
+
+                self.mask = mask_arrangement
+                self.patch = patch_arrangement
+
+                # training=True for constructing posterior as well
+                s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
+                s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
+
+    def save_images(self, image, ground_truth_labels, sample):
+        from torchvision.utils import save_image
+
+        save_patch = image
+        save_labels = ground_truth_labels # CHW
+        save_labels = save_labels.view(-1, 1, 128, 128)
+        save_patch = save_patch.view(-1, 1, 128, 128)
+
+        save = torch.cat([save_patch, save_labels, sample], dim=0)
+
+        save_image(save, 'test.png', pad_value=1, scale_each=True, normalize=True)
+
+
     def save_model(self, savename):
         model_name = self.exp_config.experiment_name + '_' + savename + '.pth'
 
