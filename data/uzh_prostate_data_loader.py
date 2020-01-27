@@ -34,7 +34,10 @@ def crop_or_pad_slice_to_size(slice, nx, ny):
     elif x == nx and y == ny:
         slice_cropped = slice
     else:
-        slice_cropped = np.zeros(slice.shape)
+        cropped_shape = list(slice.shape)
+        cropped_shape[0] = nx
+        cropped_shape[1] = ny
+        slice_cropped = np.zeros(cropped_shape)
         if x <= nx and y > ny:
             slice_cropped[x_c:x_c + x, :,...] = slice[:, y_s:y_s + ny,...]
         elif x > nx and y <= ny:
