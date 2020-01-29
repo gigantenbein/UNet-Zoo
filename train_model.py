@@ -476,15 +476,21 @@ class UNetModel:
                 self.exp_config.experiment_name,
                 model_selection)
 
-            if os.path.exists(model_path):
-                self.net.load_state_dict(torch.load(model_path))
-            else:
-                self.logger.info('The file {} does not exist. Aborting test function.'.format(model_path))
-                return
+            image_path = os.path.join(
+                sys_config.log_root,
+                self.exp_config.log_dir_name,
+                self.exp_config.experiment_name,
+            )
+
+            # if os.path.exists(model_path):
+            #     self.net.load_state_dict(torch.load(model_path))
+            # else:
+            #     self.logger.info('The file {} does not exist. Aborting test function.'.format(model_path))
+            #     return
 
             n_samples = 10
 
-            for ii in range(5):
+            for ii in range(31,100):
 
                 s_gt_arr = data.test.labels[ii, ...]
 
@@ -509,23 +515,22 @@ class UNetModel:
                 # training=True for constructing posterior as well
                 s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
                 s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
-                self.save_images(model_path, patch, val_masks, s_prediction_softmax_arrangement)
+                self.save_images(image_path, patch, val_masks, s_prediction_softmax_arrangement, ii)
 
-    def save_images(self, save_location, image, ground_truth_labels, sample):
+    def save_images(self, save_location, image, ground_truth_labels, sample, iteration):
         from torchvision.utils import save_image
 
-        file_name = os.path.join(save_location, 'image.png')
-        save_image(image, os.path.join(save_location, 'image.png'), pad_value=1, scale_each=True, normalize=True)
+        save_image(image, os.path.join(save_location, '{}image.png'.format(iteration)), pad_value=1, scale_each=True, normalize=True)
 
         for i in range(6):
             save_image(ground_truth_labels[i],
-                       os.path.join(save_location, 'mask{}.png'.format(i)),
+                       os.path.join(save_location, '{}mask{}.png'.format(iteration, i)),
                        pad_value=1,
                        scale_each=True,
                        normalize=True)
         for i in range(10):
             save_image(sample[i],
-                       os.path.join(save_location, 'sample{}.png'.format(i)),
+                       os.path.join(save_location, '{}sample{}.png'.format(iteration, i)),
                        pad_value=1,
                        scale_each=True,
                        normalize=True)
