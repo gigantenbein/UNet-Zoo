@@ -19,5 +19,5 @@ preproc_folder = '/Users/marcgantenbein/scratch/data/preproc'
 
 uzh_preproc_folder = '/Users/marcgantenbein/scratch/data/preproc'
 
-uzh_input_image_folder = '/Users/marcgantenbein/scratch/data/uzh/images'
-uzh_input_mask_folder = '/Users/marcgantenbein/scratch/data/uzh/UZH_Prostate_annotations_Christian'
+uzh_input_image_folder = '/Users/marcgantenbein/scratch/data/dummy_uzh/images'
+uzh_input_mask_folder = '/Users/marcgantenbein/scratch/data/dummy_uzh/UZH_Prostate_annotations_Christian'

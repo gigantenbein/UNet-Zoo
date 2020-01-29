@@ -509,18 +509,26 @@ class UNetModel:
                 # training=True for constructing posterior as well
                 s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
                 s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
+                self.save_images(model_path, patch, val_masks, s_prediction_softmax_arrangement)
 
-    def save_images(self, image, ground_truth_labels, sample):
+    def save_images(self, save_location, image, ground_truth_labels, sample):
         from torchvision.utils import save_image
 
-        save_patch = image
-        save_labels = ground_truth_labels # CHW
-        save_labels = save_labels.view(-1, 1, 128, 128)
-        save_patch = save_patch.view(-1, 1, 128, 128)
+        file_name = os.path.join(save_location, 'image.png')
+        save_image(image, os.path.join(save_location, 'image.png'), pad_value=1, scale_each=True, normalize=True)
 
-        save = torch.cat([save_patch, save_labels, sample], dim=0)
-
-        save_image(save, 'test.png', pad_value=1, scale_each=True, normalize=True)
+        for i in range(6):
+            save_image(ground_truth_labels[i],
+                       os.path.join(save_location, 'mask{}.png'.format(i)),
+                       pad_value=1,
+                       scale_each=True,
+                       normalize=True)
+        for i in range(10):
+            save_image(sample[i],
+                       os.path.join(save_location, 'sample{}.png'.format(i)),
+                       pad_value=1,
+                       scale_each=True,
+                       normalize=True)
 
 
     def save_model(self, savename):
