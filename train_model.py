@@ -399,25 +399,33 @@ class UNetModel:
                                                                                  nlabels=self.exp_config.n_classes)
                 ncc = utils.variance_ncc_dist(s_prediction_softmax_arrangement, ground_truth_arrangement_one_hot)
 
-                s_ = torch.argmax(s_prediction_softmax_mean, dim=0)  # HW
-                s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1])  # HW
+                dice_per_sample = []
+                for s_ in s_prediction_softmax_arrangement:
+                    s_ = torch.argmax(s_, dim=0)  # HW
+                    s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1])  # HW
 
-                # Write losses to list
-                per_lbl_dice = []
-                for lbl in range(self.exp_config.n_classes):
-                    binary_pred = (s_ == lbl) * 1
-                    binary_gt = (s == lbl) * 1
+                    # Write losses to list
+                    per_lbl_dice = []
+                    for lbl in range(self.exp_config.n_classes):
+                        binary_pred = (s_ == lbl) * 1
+                        binary_gt = (s == lbl) * 1
 
-                    if torch.sum(binary_gt) == 0 and torch.sum(binary_pred) == 0:
-                        per_lbl_dice.append(1.0)
-                    elif torch.sum(binary_pred) > 0 and torch.sum(binary_gt) == 0 or torch.sum(
-                            binary_pred) == 0 and torch.sum(
-                            binary_gt) > 0:
-                        per_lbl_dice.append(0.0)
-                    else:
-                        per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(), binary_gt.detach().cpu().numpy()))
-                dice_list.append(per_lbl_dice)
+                        if torch.sum(binary_gt) == 0 and torch.sum(binary_pred) == 0:
+                            per_lbl_dice.append(1.0)
+                        elif torch.sum(binary_pred) > 0 and torch.sum(binary_gt) == 0 or torch.sum(
+                                binary_pred) == 0 and torch.sum(
+                                binary_gt) > 0:
+                            per_lbl_dice.append(0.0)
+                        else:
+                            per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(),
+                                              binary_gt.detach().cpu().numpy()))
 
+                    dice_per_sample.append(per_lbl_dice)
+
+                dice_tensor = torch.tensor(dice_per_sample)
+                dice_tensor = torch.mean(dice_tensor, dim=0)
+
+                dice_list.append(dice_tensor)
                 ged_list.append(ged)
                 ncc_list.append(ncc)
 
@@ -425,10 +433,7 @@ class UNetModel:
                     self.logger.info(' - Mean GED: %.4f' % torch.mean(torch.tensor(ged_list)))
                     self.logger.info(' - Mean NCC: %.4f' % torch.mean(torch.tensor(ncc_list)))
 
-
             dice_tensor = torch.tensor(dice_list)
-            per_structure_dice = dice_tensor.mean(dim=0)
-
             ged_tensor = torch.tensor(ged_list)
             ncc_tensor = torch.tensor(ncc_list)
 
