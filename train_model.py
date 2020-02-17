@@ -357,51 +357,55 @@ class UNetModel:
 
             time_ = time.time()
 
-            n_samples = 100
+            end_dice = 0.0
+            end_ged = 0.0
+            end_ncc = 0.0
 
-            for ii in range(data.test.images.shape[0]):
+            for i in range(10):
+                self.logger.info('Doing iteration {}'.format(i))
+                n_samples = 10
 
-                s_gt_arr = data.test.labels[ii, ...]
+                for ii in range(data.test.images.shape[0]):
 
-                # from HW to NCHW
-                x_b = data.test.images[ii, ...]
-                patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
-                val_patch = patch.unsqueeze(dim=0).unsqueeze(dim=1)
+                    s_gt_arr = data.test.labels[ii, ...]
 
-                s_b = s_gt_arr[:, :, np.random.choice(self.exp_config.annotator_range)]
-                mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
-                val_mask = mask.unsqueeze(dim=0).unsqueeze(dim=1)
-                val_masks = torch.tensor(s_gt_arr, dtype=torch.float32).to(self.device)  # HWC
-                val_masks = val_masks.transpose(0, 2).transpose(1, 2)  # CHW
+                    # from HW to NCHW
+                    x_b = data.test.images[ii, ...]
+                    patch = torch.tensor(x_b, dtype=torch.float32).to(self.device)
+                    val_patch = patch.unsqueeze(dim=0).unsqueeze(dim=1)
 
-                patch_arrangement = val_patch.repeat((n_samples, 1, 1, 1))
+                    s_b = s_gt_arr[:, :, np.random.choice(self.exp_config.annotator_range)]
+                    mask = torch.tensor(s_b, dtype=torch.float32).to(self.device)
+                    val_mask = mask.unsqueeze(dim=0).unsqueeze(dim=1)
+                    val_masks = torch.tensor(s_gt_arr, dtype=torch.float32).to(self.device)  # HWC
+                    val_masks = val_masks.transpose(0, 2).transpose(1, 2)  # CHW
 
-                mask_arrangement = val_mask.repeat((n_samples, 1, 1, 1))
+                    patch_arrangement = val_patch.repeat((n_samples, 1, 1, 1))
 
-                self.mask = mask_arrangement
-                self.patch = patch_arrangement
+                    mask_arrangement = val_mask.repeat((n_samples, 1, 1, 1))
 
-                # training=True for constructing posterior as well
-                s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
-                s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
+                    self.mask = mask_arrangement
+                    self.patch = patch_arrangement
 
-                s_prediction_softmax_mean = torch.mean(s_prediction_softmax_arrangement, axis=0)
-                s_prediction_arrangement = torch.argmax(s_prediction_softmax_arrangement, dim=1)
+                    # training=True for constructing posterior as well
+                    s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
+                    s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
 
-                ground_truth_arrangement = val_masks  # nlabels, H, W
-                ged = utils.generalised_energy_distance(s_prediction_arrangement, ground_truth_arrangement,
-                                                        nlabels=self.exp_config.n_classes - 1,
-                                                        label_range=range(1, self.exp_config.n_classes))
+                    s_prediction_softmax_mean = torch.mean(s_prediction_softmax_arrangement, axis=0)
+                    s_prediction_arrangement = torch.argmax(s_prediction_softmax_arrangement, dim=1)
 
-                # num_gts, nlabels, H, W
-                s_gt_arr_r = val_masks.unsqueeze(dim=1)
-                ground_truth_arrangement_one_hot = utils.convert_batch_to_onehot(s_gt_arr_r,
-                                                                                 nlabels=self.exp_config.n_classes)
-                ncc = utils.variance_ncc_dist(s_prediction_softmax_arrangement, ground_truth_arrangement_one_hot)
+                    ground_truth_arrangement = val_masks  # nlabels, H, W
+                    ged = utils.generalised_energy_distance(s_prediction_arrangement, ground_truth_arrangement,
+                                                            nlabels=self.exp_config.n_classes - 1,
+                                                            label_range=range(1, self.exp_config.n_classes))
 
-                dice_per_sample = []
-                for s_ in s_prediction_softmax_arrangement:
-                    s_ = torch.argmax(s_, dim=0)  # HW
+                    # num_gts, nlabels, H, W
+                    s_gt_arr_r = val_masks.unsqueeze(dim=1)
+                    ground_truth_arrangement_one_hot = utils.convert_batch_to_onehot(s_gt_arr_r,
+                                                                                     nlabels=self.exp_config.n_classes)
+                    ncc = utils.variance_ncc_dist(s_prediction_softmax_arrangement, ground_truth_arrangement_one_hot)
+
+                    s_ = torch.argmax(s_prediction_softmax_mean, dim=0)  # HW
                     s = val_mask.view(val_mask.shape[-2], val_mask.shape[-1])  # HW
 
                     # Write losses to list
@@ -417,54 +421,59 @@ class UNetModel:
                                 binary_gt) > 0:
                             per_lbl_dice.append(0.0)
                         else:
-                            per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(),
-                                              binary_gt.detach().cpu().numpy()))
+                            per_lbl_dice.append(dc(binary_pred.detach().cpu().numpy(), binary_gt.detach().cpu().numpy()))
+                    dice_list.append(per_lbl_dice)
 
-                    dice_per_sample.append(per_lbl_dice)
+                    ged_list.append(ged)
+                    ncc_list.append(ncc)
 
-                dice_tensor = torch.tensor(dice_per_sample)
-                dice_tensor = torch.mean(dice_tensor, dim=0)
+                    if ii % 100 == 0:
+                        self.logger.info(' - Mean GED: %.4f' % torch.mean(torch.tensor(ged_list)))
+                        self.logger.info(' - Mean NCC: %.4f' % torch.mean(torch.tensor(ncc_list)))
 
-                dice_list.append(dice_tensor)
-                ged_list.append(ged)
-                ncc_list.append(ncc)
 
-                if ii % 100 == 0:
-                    self.logger.info(' - Mean GED: %.4f' % torch.mean(torch.tensor(ged_list)))
-                    self.logger.info(' - Mean NCC: %.4f' % torch.mean(torch.tensor(ncc_list)))
+                dice_tensor = torch.tensor(dice_list)
+                per_structure_dice = dice_tensor.mean(dim=0)
 
-            dice_tensor = torch.tensor(dice_list)
-            ged_tensor = torch.tensor(ged_list)
-            ncc_tensor = torch.tensor(ncc_list)
+                ged_tensor = torch.tensor(ged_list)
+                ncc_tensor = torch.tensor(ncc_list)
 
-            model_path = os.path.join(
-                sys_config.log_root,
-                self.exp_config.log_dir_name,
-                self.exp_config.experiment_name)
+                model_path = os.path.join(
+                    sys_config.log_root,
+                    self.exp_config.log_dir_name,
+                    self.exp_config.experiment_name)
 
-            np.savez(os.path.join(model_path, 'ged%s_%s_2.npz' % (str(n_samples), model_selection)), ged_tensor.numpy())
-            np.savez(os.path.join(model_path, 'ncc%s_%s_2.npz' % (str(n_samples), model_selection)), ncc_tensor.numpy())
+                np.savez(os.path.join(model_path, 'ged%s_%s_2.npz' % (str(n_samples), model_selection)), ged_tensor.numpy())
+                np.savez(os.path.join(model_path, 'ncc%s_%s_2.npz' % (str(n_samples), model_selection)), ncc_tensor.numpy())
 
-            self.avg_dice = torch.mean(dice_tensor)
-            self.foreground_dice = torch.mean(dice_tensor, dim=0)[1]
+                self.avg_dice = torch.mean(dice_tensor)
+                self.foreground_dice = torch.mean(dice_tensor, dim=0)[1]
 
-            self.avg_ged = torch.mean(ged_tensor)
-            self.avg_ncc = torch.mean(ncc_tensor)
+                self.avg_ged = torch.mean(ged_tensor)
+                self.avg_ncc = torch.mean(ncc_tensor)
 
-            logging.info('-- GED: --')
-            logging.info(torch.mean(ged_tensor))
-            logging.info(torch.std(ged_tensor))
+                logging.info('-- GED: --')
+                logging.info(torch.mean(ged_tensor))
+                logging.info(torch.std(ged_tensor))
 
-            logging.info('-- NCC: --')
-            logging.info(torch.mean(ncc_tensor))
-            logging.info(torch.std(ncc_tensor))
+                logging.info('-- NCC: --')
+                logging.info(torch.mean(ncc_tensor))
+                logging.info(torch.std(ncc_tensor))
 
-            self.logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
-            self.logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
-            self.logger.info(' - Mean GED: %.4f' % self.avg_ged)
-            self.logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
+                self.logger.info(' - Foreground dice: %.4f' % torch.mean(self.foreground_dice))
+                self.logger.info(' - Mean (neg.) ELBO: %.4f' % self.val_elbo)
+                self.logger.info(' - Mean GED: %.4f' % self.avg_ged)
+                self.logger.info(' - Mean NCC: %.4f' % self.avg_ncc)
 
-            self.logger.info('Testing took {} seconds'.format(time.time() - time_))
+                self.logger.info('Testing took {} seconds'.format(time.time() - time_))
+
+                end_dice += self.avg_dice
+                end_ged += self.avg_ged
+                end_ncc += self.avg_ncc
+            self.logger.info('Mean dice: {}'.format(end_dice/10))
+            self.logger.info('Mean ged: {}'.format(end_ged / 10))
+            self.logger.info('Mean ncc: {}'.format(end_ncc / 10))
+
 
     def generate_images(self, data, sys_config):
         self.net.eval()
@@ -519,26 +528,26 @@ class UNetModel:
 
                 # training=True for constructing posterior as well
                 s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
-                s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
-                self.save_images(image_path, patch, val_masks, s_prediction_softmax_arrangement, ii)
+                #s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
+                self.save_images(image_path, patch, val_masks, val_masks, ii)
 
-    def save_images(self, save_location, image, ground_truth_labels, sample, iteration):
+    def save_images(self, save_location, image, ground_truth_labels, sample,iteration):
         from torchvision.utils import save_image
 
         save_image(image, os.path.join(save_location, '{}image.png'.format(iteration)), pad_value=1, scale_each=True, normalize=True)
 
         for i in range(6):
             save_image(ground_truth_labels[i],
-                       os.path.join(save_location, '{}mask{}.png'.format(iteration, i)),
+                       os.path.join(save_location, '{}mask{}.png'.format(iteration,i)),
                        pad_value=1,
                        scale_each=True,
                        normalize=True)
-        for i in range(10):
-            save_image(sample[i],
-                       os.path.join(save_location, '{}sample{}.png'.format(iteration, i)),
-                       pad_value=1,
-                       scale_each=True,
-                       normalize=True)
+        # for i in range(10):
+        #     save_image(sample[i],
+        #                os.path.join(save_location, 'sample{}.png'.format(i)),
+        #                pad_value=1,
+        #                scale_each=True,
+        #                normalize=True)
 
 
     def save_model(self, savename):
