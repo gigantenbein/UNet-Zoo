@@ -528,7 +528,8 @@ class UNetModel:
                 # training=True for constructing posterior as well
                 s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
                 s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
-                self.save_images(image_path, patch, val_masks, s_prediction_softmax_arrangement, ii)
+                s_ = torch.argmax(s_prediction_softmax_arrangement, dim=1)
+                self.save_images(image_path, patch, val_masks, s_, ii)
 
     def save_images(self, save_location, image, ground_truth_labels, sample,
                     iteration):
