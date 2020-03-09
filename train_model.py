@@ -538,7 +538,7 @@ class UNetModel:
         save_image(image, os.path.join(save_location, '{}image.png'.format(iteration)), pad_value=1, scale_each=True,
                    normalize=True)
 
-        for i in range(6):
+        for i in range(self.exp_config.num_labels_per_subject):
             save_image(ground_truth_labels[i],
                        os.path.join(save_location, '{}mask{}.png'.format(iteration, i)),
                        pad_value=1,
