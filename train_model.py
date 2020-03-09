@@ -534,17 +534,18 @@ class UNetModel:
                     iteration):
         from torchvision.utils import save_image
 
-        save_image(image, os.path.join(save_location, '{}image.png'.format(iteration)), pad_value=1, scale_each=True, normalize=True)
+        save_image(image, os.path.join(save_location, '{}image.png'.format(iteration)), pad_value=1, scale_each=True,
+                   normalize=True)
 
         for i in range(6):
             save_image(ground_truth_labels[i],
-                       os.path.join(save_location, '{}mask{}.png'.format(iteration,i)),
+                       os.path.join(save_location, '{}mask{}.png'.format(iteration, i)),
                        pad_value=1,
                        scale_each=True,
                        normalize=True)
         for i in range(10):
             save_image(sample[i],
-                       os.path.join(save_location, 'sample{}.png'.format(i)),
+                       os.path.join(save_location, '{}sample{}.png'.format(iteration, i)),
                        pad_value=1,
                        scale_each=True,
                        normalize=True)
