@@ -474,7 +474,6 @@ class UNetModel:
             self.logger.info('Mean ged: {}'.format(end_ged / 10))
             self.logger.info('Mean ncc: {}'.format(end_ncc / 10))
 
-
     def generate_images(self, data, sys_config):
         self.net.eval()
         with torch.no_grad():
@@ -528,10 +527,11 @@ class UNetModel:
 
                 # training=True for constructing posterior as well
                 s_out_eval_list = self.net.forward(patch_arrangement, mask_arrangement, training=False)
-                #s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
-                self.save_images(image_path, patch, val_masks, val_masks, ii)
+                s_prediction_softmax_arrangement = self.net.accumulate_output(s_out_eval_list, use_softmax=True)
+                self.save_images(image_path, patch, val_masks, s_prediction_softmax_arrangement, ii)
 
-    def save_images(self, save_location, image, ground_truth_labels, sample,iteration):
+    def save_images(self, save_location, image, ground_truth_labels, sample,
+                    iteration):
         from torchvision.utils import save_image
 
         save_image(image, os.path.join(save_location, '{}image.png'.format(iteration)), pad_value=1, scale_each=True, normalize=True)
