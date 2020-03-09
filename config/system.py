@@ -16,6 +16,7 @@ uzh_segmentations = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/UZH_Pros
 uzh_images = '/usr/bmicnas01/data-biwi-01/bmicdatasets-originals/Originals/USZ/Prostate/'
 
 uzh_preproc_folder = '/scratch_net/airfox/ganmarc/data/preproc'
+preproc_golder = '/scratch_net/airfox/ganmarc/data/preproc'
 
 uzh_input_image_folder = '/usr/bmicnas01/data-biwi-01/bmicdatasets-originals/Originals/USZ/Prostate/'
 uzh_input_mask_folder = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/UZH_Prostate_annotations_Christian'
