@@ -478,7 +478,7 @@ class UNetModel:
         self.net.eval()
         with torch.no_grad():
 
-            model_selection = self.exp_config.experiment_name + '_best_loss.pth'
+            model_selection = self.exp_config.experiment_name + '_best_dice.pth'
             self.logger.info('Generating samples {}'.format(model_selection))
 
             self.logger.info('Loading pretrained model {}'.format(model_selection))
