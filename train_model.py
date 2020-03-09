@@ -542,12 +542,12 @@ class UNetModel:
                        pad_value=1,
                        scale_each=True,
                        normalize=True)
-        # for i in range(10):
-        #     save_image(sample[i],
-        #                os.path.join(save_location, 'sample{}.png'.format(i)),
-        #                pad_value=1,
-        #                scale_each=True,
-        #                normalize=True)
+        for i in range(10):
+            save_image(sample[i],
+                       os.path.join(save_location, 'sample{}.png'.format(i)),
+                       pad_value=1,
+                       scale_each=True,
+                       normalize=True)
 
 
     def save_model(self, savename):

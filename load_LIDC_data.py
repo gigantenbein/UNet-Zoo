@@ -1,3 +1,7 @@
+# This code is based on: https://github.com/stefanknegt/Probabilistic-Unet-Pytorch/
+# Author: Stefan Knegt https://github.com/stefanknegt/Probabilistic-Unet-Pytorch/
+# Modifications: Marc Gantenbein
+# This software is licensed under the Apache License 2.0
 import torch
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
@@ -30,25 +34,6 @@ def load_data_into_loader(sys_config, name, batch_size, transform=None):
     print("Number of training/test/validation patches:", (len(train_indices), len(test_indices), len(val_indices)))
 
     return train_loader, test_loader, validation_loader
-
-
-def create_pickle_data_with_n_samples(sys_config, n=100):
-    dataset = LIDC_IDRI(dataset_location=sys_config.data_root)
-
-    print('Create pickle file with {} samples'.format(n))
-    data_list = []
-    for i in range(n):
-        values = {}
-        values['image'] = dataset.images[i]
-        values['masks'] = dataset.labels[i]
-        values['series_uid'] = dataset.series_uid[i]
-
-        data_list.append(values)
-
-    data_list = dict(zip(list(range(n)), data_list))
-
-    with open('/Users/marcgantenbein/scratch/data/size1000/lidc_data_length_{}.pickle'.format(n), 'wb') as file:
-        pickle.dump(data_list, file)
 
 
 class LIDC_IDRI(Dataset):
