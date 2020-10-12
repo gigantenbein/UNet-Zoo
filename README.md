@@ -1,5 +1,9 @@
 # UNet-Zoo
-This repository features different U-Net implementations such as vanilla U-Net, reversible U-Net, probabilistic U-Net, PHiSeg and a reversible variant of these as well.
+This repository features different U-Net implementations such as vanilla U-Net, reversible U-Net, probabilistic U-Net,
+PHiSeg and a reversible version, RevPHiSeg.
+The experiments on the LIDC and an in-house prostate dataset with memory savings of up to 30 % have been published at
+[UNSURE by MICCAI 2020](https://unsuremiccai.github.io/). The paper can also be found on
+[arxiv](https://arxiv.org/abs/2008.06999).
 
 # Setting up the environment
 
@@ -31,4 +35,10 @@ or if you want to run it with the system_config.py configuration, run
 
 # Acknowledgements
 
-The code for the Probabilistic U-Net has been adapted from Stefan Knegt's implementation https://github.com/stefanknegt/Probabilistic-Unet-Pytorch. The PHiSeg implementation was based on the Tensorflow implementation of https://github.com/baumgach/PHiSeg-code
+The code for the Probabilistic U-Net has been adapted from [Stefan Knegt's
+implementation](https://github.com/stefanknegt/Probabilistic-Unet-Pytorch).
+The PHiSeg implementation was based on the Tensorflow implementation of https://github.com/baumgach/PHiSeg-code which
+was published at [MICCAI 2019](https://arxiv.org/abs/1906.04045).
+For integrating the reversible blocks I took inspiration from
+https://github.com/RobinBruegger/PartiallyReversibleUnet which was published at
+[MICCAI 2019](https://arxiv.org/abs/1906.06148) aswell.
